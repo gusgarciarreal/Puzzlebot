@@ -17,9 +17,9 @@ This space is dedicated to the development and integration of various modules to
 Build a flexible and robust framework for the Puzzlebot that supports testing, learning, and innovation through hands-on robotics programming.
 
 ## 👥 Contributors
-Gustavo Garciarreal Morales
-Sofía Sánchez García
-Jossue Patricio Espinosa Tovar
-Edrick Galicia
+- Gustavo Garciarreal Morales
+- Sofía Sánchez García
+- Jossue Patricio Espinosa Tovar
+- Edrick Galicia
 
 This is a team project – Feel free to fork, explore, and contribute 🤝
