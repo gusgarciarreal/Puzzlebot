@@ -1,0 +1,12 @@
+package.xml
+setup.cfg
+setup.py
+resource/seguidor_poligonos
+seguidor_poligonos/__init__.py
+seguidor_poligonos.egg-info/PKG-INFO
+seguidor_poligonos.egg-info/SOURCES.txt
+seguidor_poligonos.egg-info/dependency_links.txt
+seguidor_poligonos.egg-info/entry_points.txt
+seguidor_poligonos.egg-info/requires.txt
+seguidor_poligonos.egg-info/top_level.txt
+seguidor_poligonos.egg-info/zip-safe

@@ -1,0 +1,15 @@
+running develop
+running egg_info
+writing interprete.egg-info/PKG-INFO
+writing dependency_links to interprete.egg-info/dependency_links.txt
+writing entry points to interprete.egg-info/entry_points.txt
+writing requirements to interprete.egg-info/requires.txt
+writing top-level names to interprete.egg-info/top_level.txt
+reading manifest file 'interprete.egg-info/SOURCES.txt'
+writing manifest file 'interprete.egg-info/SOURCES.txt'
+running build_ext
+Creating /home/gusgm/sexto/Puzzlebot/reto/install/interprete/lib/python3.10/site-packages/interprete.egg-link (link to .)
+Installing interprete script to /home/gusgm/sexto/Puzzlebot/reto/install/interprete/lib/interprete
+
+Installed /home/gusgm/sexto/Puzzlebot/reto/build/interprete
+running symlink_data

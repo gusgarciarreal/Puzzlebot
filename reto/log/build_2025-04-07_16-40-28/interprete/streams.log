@@ -1,0 +1,17 @@
+[1.315s] Invoking command in '/home/gusgm/sexto/Puzzlebot/reto/build/interprete': PYTHONPATH=/home/gusgm/sexto/Puzzlebot/reto/build/interprete/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/gusgm/sexto/Puzzlebot/reto/install/interprete/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py develop --editable --build-directory /home/gusgm/sexto/Puzzlebot/reto/build/interprete/build --no-deps symlink_data
+[1.634s] running develop
+[1.794s] running egg_info
+[1.794s] writing interprete.egg-info/PKG-INFO
+[1.794s] writing dependency_links to interprete.egg-info/dependency_links.txt
+[1.795s] writing entry points to interprete.egg-info/entry_points.txt
+[1.795s] writing requirements to interprete.egg-info/requires.txt
+[1.795s] writing top-level names to interprete.egg-info/top_level.txt
+[1.796s] reading manifest file 'interprete.egg-info/SOURCES.txt'
+[1.796s] writing manifest file 'interprete.egg-info/SOURCES.txt'
+[1.799s] running build_ext
+[1.799s] Creating /home/gusgm/sexto/Puzzlebot/reto/install/interprete/lib/python3.10/site-packages/interprete.egg-link (link to .)
+[1.799s] Installing interprete script to /home/gusgm/sexto/Puzzlebot/reto/install/interprete/lib/interprete
+[1.799s] 
+[1.799s] Installed /home/gusgm/sexto/Puzzlebot/reto/build/interprete
+[1.799s] running symlink_data
+[1.820s] Invoked command in '/home/gusgm/sexto/Puzzlebot/reto/build/interprete' returned '0': PYTHONPATH=/home/gusgm/sexto/Puzzlebot/reto/build/interprete/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/gusgm/sexto/Puzzlebot/reto/install/interprete/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py develop --editable --build-directory /home/gusgm/sexto/Puzzlebot/reto/build/interprete/build --no-deps symlink_data

@@ -1,0 +1,13 @@
+package.xml
+setup.cfg
+setup.py
+resource/seguidor_triangular_OLC
+seguidor_triangular_OLC/__init__.py
+seguidor_triangular_OLC/seguidor_triangular_OLC.py
+seguidor_triangular_OLC.egg-info/PKG-INFO
+seguidor_triangular_OLC.egg-info/SOURCES.txt
+seguidor_triangular_OLC.egg-info/dependency_links.txt
+seguidor_triangular_OLC.egg-info/entry_points.txt
+seguidor_triangular_OLC.egg-info/requires.txt
+seguidor_triangular_OLC.egg-info/top_level.txt
+seguidor_triangular_OLC.egg-info/zip-safe

@@ -1,0 +1,66 @@
+[0.153s] DEBUG:colcon:Command line arguments: ['/usr/bin/colcon', 'list', '-p', '--base-paths', '/home/gusgm/sexto/Puzzlebot/reto']
+[0.153s] DEBUG:colcon:Parsed command line arguments: Namespace(log_base=None, log_level=None, verb_name='list', build_base='build', ignore_user_meta=False, metas=['./colcon.meta'], base_paths=['/home/gusgm/sexto/Puzzlebot/reto'], packages_ignore=None, packages_ignore_regex=None, paths=None, packages_up_to=None, packages_up_to_regex=None, packages_above=None, packages_above_and_dependencies=None, packages_above_depth=None, packages_select_by_dep=None, packages_skip_by_dep=None, packages_skip_up_to=None, packages_select_build_failed=False, packages_skip_build_finished=False, packages_select_test_failures=False, packages_skip_test_passed=False, packages_select=None, packages_skip=None, packages_select_regex=None, packages_skip_regex=None, packages_start=None, packages_end=None, allow_overriding=[], topological_order=False, names_only=False, paths_only=True, topological_graph=False, topological_graph_dot=False, topological_graph_density=False, topological_graph_legend=False, topological_graph_dot_cluster=False, topological_graph_dot_include_skipped=False, verb_parser=<colcon_defaults.argument_parser.defaults.DefaultArgumentsDecorator object at 0x72f6ddeaaa40>, verb_extension=<colcon_package_information.verb.list.ListVerb object at 0x72f6dde2f730>, main=<bound method ListVerb.main of <colcon_package_information.verb.list.ListVerb object at 0x72f6dde2f730>>)
+[0.334s] Level 1:colcon.colcon_core.package_discovery:discover_packages(colcon_meta) check parameters
+[0.334s] Level 1:colcon.colcon_core.package_discovery:discover_packages(recursive) check parameters
+[0.334s] Level 1:colcon.colcon_core.package_discovery:discover_packages(ignore) check parameters
+[0.334s] Level 1:colcon.colcon_core.package_discovery:discover_packages(path) check parameters
+[0.334s] Level 1:colcon.colcon_core.package_discovery:discover_packages(recursive) discover
+[0.334s] INFO:colcon.colcon_core.package_discovery:Crawling recursively for packages in '/home/gusgm/sexto/Puzzlebot/reto'
+[0.334s] Level 1:colcon.colcon_core.package_identification:_identify(/home/gusgm/sexto/Puzzlebot/reto) by extensions ['ignore', 'ignore_ament_install']
+[0.334s] Level 1:colcon.colcon_core.package_identification:_identify(/home/gusgm/sexto/Puzzlebot/reto) by extension 'ignore'
+[0.334s] Level 1:colcon.colcon_core.package_identification:_identify(/home/gusgm/sexto/Puzzlebot/reto) by extension 'ignore_ament_install'
+[0.334s] Level 1:colcon.colcon_core.package_identification:_identify(/home/gusgm/sexto/Puzzlebot/reto) by extensions ['colcon_pkg']
+[0.334s] Level 1:colcon.colcon_core.package_identification:_identify(/home/gusgm/sexto/Puzzlebot/reto) by extension 'colcon_pkg'
+[0.334s] Level 1:colcon.colcon_core.package_identification:_identify(/home/gusgm/sexto/Puzzlebot/reto) by extensions ['colcon_meta']
+[0.334s] Level 1:colcon.colcon_core.package_identification:_identify(/home/gusgm/sexto/Puzzlebot/reto) by extension 'colcon_meta'
+[0.334s] Level 1:colcon.colcon_core.package_identification:_identify(/home/gusgm/sexto/Puzzlebot/reto) by extensions ['ros']
+[0.334s] Level 1:colcon.colcon_core.package_identification:_identify(/home/gusgm/sexto/Puzzlebot/reto) by extension 'ros'
+[0.345s] Level 1:colcon.colcon_core.package_identification:_identify(/home/gusgm/sexto/Puzzlebot/reto) by extensions ['cmake', 'python']
+[0.345s] Level 1:colcon.colcon_core.package_identification:_identify(/home/gusgm/sexto/Puzzlebot/reto) by extension 'cmake'
+[0.345s] Level 1:colcon.colcon_core.package_identification:_identify(/home/gusgm/sexto/Puzzlebot/reto) by extension 'python'
+[0.345s] Level 1:colcon.colcon_core.package_identification:_identify(/home/gusgm/sexto/Puzzlebot/reto) by extensions ['python_setup_py']
+[0.345s] Level 1:colcon.colcon_core.package_identification:_identify(/home/gusgm/sexto/Puzzlebot/reto) by extension 'python_setup_py'
+[0.345s] Level 1:colcon.colcon_core.package_identification:_identify(/home/gusgm/sexto/Puzzlebot/reto/build) by extensions ['ignore', 'ignore_ament_install']
+[0.345s] Level 1:colcon.colcon_core.package_identification:_identify(/home/gusgm/sexto/Puzzlebot/reto/build) by extension 'ignore'
+[0.345s] Level 1:colcon.colcon_core.package_identification:_identify(/home/gusgm/sexto/Puzzlebot/reto/build) ignored
+[0.345s] Level 1:colcon.colcon_core.package_identification:_identify(/home/gusgm/sexto/Puzzlebot/reto/install) by extensions ['ignore', 'ignore_ament_install']
+[0.345s] Level 1:colcon.colcon_core.package_identification:_identify(/home/gusgm/sexto/Puzzlebot/reto/install) by extension 'ignore'
+[0.345s] Level 1:colcon.colcon_core.package_identification:_identify(/home/gusgm/sexto/Puzzlebot/reto/install) ignored
+[0.346s] Level 1:colcon.colcon_core.package_identification:_identify(/home/gusgm/sexto/Puzzlebot/reto/log) by extensions ['ignore', 'ignore_ament_install']
+[0.346s] Level 1:colcon.colcon_core.package_identification:_identify(/home/gusgm/sexto/Puzzlebot/reto/log) by extension 'ignore'
+[0.346s] Level 1:colcon.colcon_core.package_identification:_identify(/home/gusgm/sexto/Puzzlebot/reto/log) ignored
+[0.346s] Level 1:colcon.colcon_core.package_identification:_identify(/home/gusgm/sexto/Puzzlebot/reto/src) by extensions ['ignore', 'ignore_ament_install']
+[0.346s] Level 1:colcon.colcon_core.package_identification:_identify(/home/gusgm/sexto/Puzzlebot/reto/src) by extension 'ignore'
+[0.346s] Level 1:colcon.colcon_core.package_identification:_identify(/home/gusgm/sexto/Puzzlebot/reto/src) by extension 'ignore_ament_install'
+[0.346s] Level 1:colcon.colcon_core.package_identification:_identify(/home/gusgm/sexto/Puzzlebot/reto/src) by extensions ['colcon_pkg']
+[0.346s] Level 1:colcon.colcon_core.package_identification:_identify(/home/gusgm/sexto/Puzzlebot/reto/src) by extension 'colcon_pkg'
+[0.346s] Level 1:colcon.colcon_core.package_identification:_identify(/home/gusgm/sexto/Puzzlebot/reto/src) by extensions ['colcon_meta']
+[0.346s] Level 1:colcon.colcon_core.package_identification:_identify(/home/gusgm/sexto/Puzzlebot/reto/src) by extension 'colcon_meta'
+[0.346s] Level 1:colcon.colcon_core.package_identification:_identify(/home/gusgm/sexto/Puzzlebot/reto/src) by extensions ['ros']
+[0.346s] Level 1:colcon.colcon_core.package_identification:_identify(/home/gusgm/sexto/Puzzlebot/reto/src) by extension 'ros'
+[0.346s] Level 1:colcon.colcon_core.package_identification:_identify(/home/gusgm/sexto/Puzzlebot/reto/src) by extensions ['cmake', 'python']
+[0.346s] Level 1:colcon.colcon_core.package_identification:_identify(/home/gusgm/sexto/Puzzlebot/reto/src) by extension 'cmake'
+[0.346s] Level 1:colcon.colcon_core.package_identification:_identify(/home/gusgm/sexto/Puzzlebot/reto/src) by extension 'python'
+[0.346s] Level 1:colcon.colcon_core.package_identification:_identify(/home/gusgm/sexto/Puzzlebot/reto/src) by extensions ['python_setup_py']
+[0.346s] Level 1:colcon.colcon_core.package_identification:_identify(/home/gusgm/sexto/Puzzlebot/reto/src) by extension 'python_setup_py'
+[0.346s] Level 1:colcon.colcon_core.package_identification:_identify(/home/gusgm/sexto/Puzzlebot/reto/src/interprete) by extensions ['ignore', 'ignore_ament_install']
+[0.346s] Level 1:colcon.colcon_core.package_identification:_identify(/home/gusgm/sexto/Puzzlebot/reto/src/interprete) by extension 'ignore'
+[0.346s] Level 1:colcon.colcon_core.package_identification:_identify(/home/gusgm/sexto/Puzzlebot/reto/src/interprete) by extension 'ignore_ament_install'
+[0.346s] Level 1:colcon.colcon_core.package_identification:_identify(/home/gusgm/sexto/Puzzlebot/reto/src/interprete) by extensions ['colcon_pkg']
+[0.346s] Level 1:colcon.colcon_core.package_identification:_identify(/home/gusgm/sexto/Puzzlebot/reto/src/interprete) by extension 'colcon_pkg'
+[0.346s] Level 1:colcon.colcon_core.package_identification:_identify(/home/gusgm/sexto/Puzzlebot/reto/src/interprete) by extensions ['colcon_meta']
+[0.346s] Level 1:colcon.colcon_core.package_identification:_identify(/home/gusgm/sexto/Puzzlebot/reto/src/interprete) by extension 'colcon_meta'
+[0.346s] Level 1:colcon.colcon_core.package_identification:_identify(/home/gusgm/sexto/Puzzlebot/reto/src/interprete) by extensions ['ros']
+[0.346s] Level 1:colcon.colcon_core.package_identification:_identify(/home/gusgm/sexto/Puzzlebot/reto/src/interprete) by extension 'ros'
+[0.349s] DEBUG:colcon.colcon_core.package_identification:Package '/home/gusgm/sexto/Puzzlebot/reto/src/interprete' with type 'ros.ament_python' and name 'interprete'
+[0.349s] Level 1:colcon.colcon_core.package_identification:_identify(/home/gusgm/sexto/Puzzlebot/reto/src/seguidor_triangular_OLC) by extensions ['ignore', 'ignore_ament_install']
+[0.349s] Level 1:colcon.colcon_core.package_identification:_identify(/home/gusgm/sexto/Puzzlebot/reto/src/seguidor_triangular_OLC) by extension 'ignore'
+[0.349s] Level 1:colcon.colcon_core.package_identification:_identify(/home/gusgm/sexto/Puzzlebot/reto/src/seguidor_triangular_OLC) by extension 'ignore_ament_install'
+[0.349s] Level 1:colcon.colcon_core.package_identification:_identify(/home/gusgm/sexto/Puzzlebot/reto/src/seguidor_triangular_OLC) by extensions ['colcon_pkg']
+[0.349s] Level 1:colcon.colcon_core.package_identification:_identify(/home/gusgm/sexto/Puzzlebot/reto/src/seguidor_triangular_OLC) by extension 'colcon_pkg'
+[0.349s] Level 1:colcon.colcon_core.package_identification:_identify(/home/gusgm/sexto/Puzzlebot/reto/src/seguidor_triangular_OLC) by extensions ['colcon_meta']
+[0.349s] Level 1:colcon.colcon_core.package_identification:_identify(/home/gusgm/sexto/Puzzlebot/reto/src/seguidor_triangular_OLC) by extension 'colcon_meta'
+[0.349s] Level 1:colcon.colcon_core.package_identification:_identify(/home/gusgm/sexto/Puzzlebot/reto/src/seguidor_triangular_OLC) by extensions ['ros']
+[0.349s] Level 1:colcon.colcon_core.package_identification:_identify(/home/gusgm/sexto/Puzzlebot/reto/src/seguidor_triangular_OLC) by extension 'ros'
+[0.350s] DEBUG:colcon.colcon_core.package_identification:Package '/home/gusgm/sexto/Puzzlebot/reto/src/seguidor_triangular_OLC' with type 'ros.ament_python' and name 'seguidor_triangular_OLC'
+[0.350s] Level 1:colcon.colcon_core.package_discovery:discover_packages(recursive) using defaults

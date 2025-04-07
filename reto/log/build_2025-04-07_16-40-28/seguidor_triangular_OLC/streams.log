@@ -1,0 +1,17 @@
+[1.289s] Invoking command in '/home/gusgm/sexto/Puzzlebot/reto/build/seguidor_triangular_OLC': PYTHONPATH=/home/gusgm/sexto/Puzzlebot/reto/build/seguidor_triangular_OLC/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/gusgm/sexto/Puzzlebot/reto/install/seguidor_triangular_OLC/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py develop --editable --build-directory /home/gusgm/sexto/Puzzlebot/reto/build/seguidor_triangular_OLC/build --no-deps symlink_data
+[1.591s] running develop
+[1.765s] running egg_info
+[1.766s] writing seguidor_triangular_OLC.egg-info/PKG-INFO
+[1.766s] writing dependency_links to seguidor_triangular_OLC.egg-info/dependency_links.txt
+[1.766s] writing entry points to seguidor_triangular_OLC.egg-info/entry_points.txt
+[1.766s] writing requirements to seguidor_triangular_OLC.egg-info/requires.txt
+[1.766s] writing top-level names to seguidor_triangular_OLC.egg-info/top_level.txt
+[1.767s] reading manifest file 'seguidor_triangular_OLC.egg-info/SOURCES.txt'
+[1.767s] writing manifest file 'seguidor_triangular_OLC.egg-info/SOURCES.txt'
+[1.770s] running build_ext
+[1.770s] Creating /home/gusgm/sexto/Puzzlebot/reto/install/seguidor_triangular_OLC/lib/python3.10/site-packages/seguidor-triangular-OLC.egg-link (link to .)
+[1.771s] Installing seguidor_triangular script to /home/gusgm/sexto/Puzzlebot/reto/install/seguidor_triangular_OLC/lib/seguidor_triangular_OLC
+[1.771s] 
+[1.771s] Installed /home/gusgm/sexto/Puzzlebot/reto/build/seguidor_triangular_OLC
+[1.771s] running symlink_data
+[1.809s] Invoked command in '/home/gusgm/sexto/Puzzlebot/reto/build/seguidor_triangular_OLC' returned '0': PYTHONPATH=/home/gusgm/sexto/Puzzlebot/reto/build/seguidor_triangular_OLC/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/gusgm/sexto/Puzzlebot/reto/install/seguidor_triangular_OLC/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py develop --editable --build-directory /home/gusgm/sexto/Puzzlebot/reto/build/seguidor_triangular_OLC/build --no-deps symlink_data

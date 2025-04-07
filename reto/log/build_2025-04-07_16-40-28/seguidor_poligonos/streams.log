@@ -1,0 +1,23 @@
+[1.293s] Invoking command in '/home/gusgm/sexto/Puzzlebot/reto/build/seguidor_poligonos': PYTHONPATH=/home/gusgm/sexto/Puzzlebot/reto/build/seguidor_poligonos/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/gusgm/sexto/Puzzlebot/reto/install/seguidor_poligonos/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py develop --editable --build-directory /home/gusgm/sexto/Puzzlebot/reto/build/seguidor_poligonos/build --no-deps symlink_data
+[1.610s] running develop
+[1.778s] running egg_info
+[1.778s] creating seguidor_poligonos.egg-info
+[1.778s] writing seguidor_poligonos.egg-info/PKG-INFO
+[1.778s] writing dependency_links to seguidor_poligonos.egg-info/dependency_links.txt
+[1.778s] writing entry points to seguidor_poligonos.egg-info/entry_points.txt
+[1.778s] writing requirements to seguidor_poligonos.egg-info/requires.txt
+[1.778s] writing top-level names to seguidor_poligonos.egg-info/top_level.txt
+[1.779s] writing manifest file 'seguidor_poligonos.egg-info/SOURCES.txt'
+[1.780s] reading manifest file 'seguidor_poligonos.egg-info/SOURCES.txt'
+[1.780s] writing manifest file 'seguidor_poligonos.egg-info/SOURCES.txt'
+[1.783s] running build_ext
+[1.783s] Creating /home/gusgm/sexto/Puzzlebot/reto/install/seguidor_poligonos/lib/python3.10/site-packages/seguidor-poligonos.egg-link (link to .)
+[1.784s] 
+[1.784s] Installed /home/gusgm/sexto/Puzzlebot/reto/build/seguidor_poligonos
+[1.784s] running symlink_data
+[1.784s] creating /home/gusgm/sexto/Puzzlebot/reto/install/seguidor_poligonos/share/ament_index
+[1.784s] creating /home/gusgm/sexto/Puzzlebot/reto/install/seguidor_poligonos/share/ament_index/resource_index
+[1.784s] creating /home/gusgm/sexto/Puzzlebot/reto/install/seguidor_poligonos/share/ament_index/resource_index/packages
+[1.784s] symbolically linking /home/gusgm/sexto/Puzzlebot/reto/build/seguidor_poligonos/resource/seguidor_poligonos -> /home/gusgm/sexto/Puzzlebot/reto/install/seguidor_poligonos/share/ament_index/resource_index/packages
+[1.784s] symbolically linking /home/gusgm/sexto/Puzzlebot/reto/build/seguidor_poligonos/package.xml -> /home/gusgm/sexto/Puzzlebot/reto/install/seguidor_poligonos/share/seguidor_poligonos
+[1.816s] Invoked command in '/home/gusgm/sexto/Puzzlebot/reto/build/seguidor_poligonos' returned '0': PYTHONPATH=/home/gusgm/sexto/Puzzlebot/reto/build/seguidor_poligonos/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/gusgm/sexto/Puzzlebot/reto/install/seguidor_poligonos/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py develop --editable --build-directory /home/gusgm/sexto/Puzzlebot/reto/build/seguidor_poligonos/build --no-deps symlink_data

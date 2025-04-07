@@ -1,0 +1,21 @@
+running develop
+running egg_info
+creating seguidor_poligonos.egg-info
+writing seguidor_poligonos.egg-info/PKG-INFO
+writing dependency_links to seguidor_poligonos.egg-info/dependency_links.txt
+writing entry points to seguidor_poligonos.egg-info/entry_points.txt
+writing requirements to seguidor_poligonos.egg-info/requires.txt
+writing top-level names to seguidor_poligonos.egg-info/top_level.txt
+writing manifest file 'seguidor_poligonos.egg-info/SOURCES.txt'
+reading manifest file 'seguidor_poligonos.egg-info/SOURCES.txt'
+writing manifest file 'seguidor_poligonos.egg-info/SOURCES.txt'
+running build_ext
+Creating /home/gusgm/sexto/Puzzlebot/reto/install/seguidor_poligonos/lib/python3.10/site-packages/seguidor-poligonos.egg-link (link to .)
+
+Installed /home/gusgm/sexto/Puzzlebot/reto/build/seguidor_poligonos
+running symlink_data
+creating /home/gusgm/sexto/Puzzlebot/reto/install/seguidor_poligonos/share/ament_index
+creating /home/gusgm/sexto/Puzzlebot/reto/install/seguidor_poligonos/share/ament_index/resource_index
+creating /home/gusgm/sexto/Puzzlebot/reto/install/seguidor_poligonos/share/ament_index/resource_index/packages
+symbolically linking /home/gusgm/sexto/Puzzlebot/reto/build/seguidor_poligonos/resource/seguidor_poligonos -> /home/gusgm/sexto/Puzzlebot/reto/install/seguidor_poligonos/share/ament_index/resource_index/packages
+symbolically linking /home/gusgm/sexto/Puzzlebot/reto/build/seguidor_poligonos/package.xml -> /home/gusgm/sexto/Puzzlebot/reto/install/seguidor_poligonos/share/seguidor_poligonos

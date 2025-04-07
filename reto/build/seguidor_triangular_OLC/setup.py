@@ -1,0 +1,1 @@
+/home/gusgm/sexto/Puzzlebot/reto/src/seguidor_triangular_OLC/setup.py

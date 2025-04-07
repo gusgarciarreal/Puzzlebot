@@ -1,0 +1,9 @@
+source;share/seguidor_triangular_OLC/hook/pythonpath.ps1
+source;share/seguidor_triangular_OLC/hook/pythonpath.dsv
+source;share/seguidor_triangular_OLC/hook/pythonpath.sh
+source;share/seguidor_triangular_OLC/hook/ament_prefix_path.ps1
+source;share/seguidor_triangular_OLC/hook/ament_prefix_path.dsv
+source;share/seguidor_triangular_OLC/hook/ament_prefix_path.sh
+source;../../build/seguidor_triangular_OLC/share/seguidor_triangular_OLC/hook/pythonpath_develop.ps1
+source;../../build/seguidor_triangular_OLC/share/seguidor_triangular_OLC/hook/pythonpath_develop.dsv
+source;../../build/seguidor_triangular_OLC/share/seguidor_triangular_OLC/hook/pythonpath_develop.sh

@@ -1,0 +1,3 @@
+[console_scripts]
+interprete = interprete.interprete:main
+
