@@ -3,6 +3,7 @@ import rclpy                                  # ROS 2 Python client library.
 from rclpy.node import Node                   # Base class to create ROS 2 nodes.
 import math                                   # Library for mathematical functions.
 import time                                   # Module to handle delays and timestamps.
+from std_msgs.msg import Float32
 
 # Import the ROS message type for velocity commands.
 from geometry_msgs.msg import Twist
@@ -13,7 +14,7 @@ class Controller(Node):
     def __init__(self):
         # Initialize the node with the name 'controller'
         super().__init__('controller')
-        
+
         # Create a subscription to the 'pose' topic where ExtendedPose messages are published.
         # This is the same topic on which the path_generator node publishes segments.
         self.subscription = self.create_subscription(
@@ -25,6 +26,10 @@ class Controller(Node):
         
         # Create a publisher for the 'cmd_vel' topic to publish velocity commands to the robot.
         self.cmd_pub = self.create_publisher(Twist, 'cmd_vel', 10)
+
+        # Create a publisher for the 'anglel' topic to debug
+        self.angle_pub = self.create_publisher(Float32, 'angle', 10)
+
         self.get_logger().info("Controller node started.")
         
         # Initialize the simulated robot state (current position and orientation).
@@ -66,6 +71,8 @@ class Controller(Node):
         if abs(delta_angle) > 0.01:
             # Determine the direction of rotation using the angular velocity provided in the message.
             w = msg.angular_velocity if delta_angle >= 0 else -msg.angular_velocity
+            self.angle_pub.publish(w)
+            
             # Calculate the time required to perform the rotation.
             t_rot = abs(delta_angle) / abs(msg.angular_velocity) if abs(msg.angular_velocity) > 0 else 0.0
             self.get_logger().info(f"Rotating {delta_angle:.2f} rad for {t_rot:.2f} s")
