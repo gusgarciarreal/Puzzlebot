@@ -1,3 +1,4 @@
 [console_scripts]
-
+controller = seguidor_poligonos.controller:main
+path_generator = seguidor_poligonos.path_generator:main
 

@@ -1,8 +1,10 @@
 package.xml
 setup.cfg
 setup.py
-resource/seguidor_poligonos
+launch/path_controller_launch.py
 seguidor_poligonos/__init__.py
+seguidor_poligonos/controller.py
+seguidor_poligonos/path_generator.py
 seguidor_poligonos.egg-info/PKG-INFO
 seguidor_poligonos.egg-info/SOURCES.txt
 seguidor_poligonos.egg-info/dependency_links.txt
