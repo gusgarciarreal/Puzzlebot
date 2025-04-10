@@ -10,11 +10,11 @@ def generate_launch_description():
         name='path_generator',
         output='screen',
         parameters=[
-            {"waypoints": "[(0,0), (1,0), (1,1), (0,1), (0,0)]"},  # Lista de waypoints
+            {"waypoints": "[(0,0), (0.01,0)]"},  # Lista de waypoints
             {"mode": "time"},  # "speeds" o "time"
             {"linear_velocity": 0.2},
             {"angular_velocity": 0.5235987755982988},  # 30 grados en radianes
-            {"total_time": 16.4}  # Se utiliza únicamente en modo "time"
+            {"total_time": 5.0}  # Se utiliza únicamente en modo "time"
         ]
     )
 
