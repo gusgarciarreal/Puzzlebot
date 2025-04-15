@@ -19,7 +19,7 @@ Build a flexible and robust framework for the Puzzlebot that supports testing, l
 ## 👥 Contributors
 - Gustavo Garciarreal Morales
 - Sofía Sánchez García
-- Jossue Patricio Espinosa Tovar
+- Jossue Patricio Espinosa Tobar
 - Edrick Galicia
 
 This is a team project – Feel free to fork, explore, and contribute 🤝
