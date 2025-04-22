@@ -1,1 +1,4 @@
-/home/gusgm/sexto/Puzzlebot/reto/src/extended_pose_interface/msg/ExtendedPose.msg
+geometry_msgs/Pose pose
+float32 linear_velocity
+float32 angular_velocity
+float32 time_stamp

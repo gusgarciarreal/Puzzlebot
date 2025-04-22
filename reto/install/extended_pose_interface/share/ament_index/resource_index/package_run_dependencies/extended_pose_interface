@@ -1,1 +1,1 @@
-/home/gusgm/sexto/Puzzlebot/reto/build/extended_pose_interface/ament_cmake_index/share/ament_index/resource_index/package_run_dependencies/extended_pose_interface
+geometry_msgs;rosidl_default_runtime;ament_lint_auto;ament_lint_common

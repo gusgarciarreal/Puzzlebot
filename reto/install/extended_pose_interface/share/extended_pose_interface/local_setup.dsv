@@ -1,1 +1,4 @@
-/home/gusgm/sexto/Puzzlebot/reto/build/extended_pose_interface/ament_cmake_environment_hooks/local_setup.dsv
+source;share/extended_pose_interface/environment/ament_prefix_path.sh
+source;share/extended_pose_interface/environment/library_path.sh
+source;share/extended_pose_interface/environment/path.sh
+source;share/extended_pose_interface/environment/pythonpath.sh

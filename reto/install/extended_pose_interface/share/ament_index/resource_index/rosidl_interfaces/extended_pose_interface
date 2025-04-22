@@ -1,1 +1,2 @@
-/home/gusgm/sexto/Puzzlebot/reto/build/extended_pose_interface/ament_cmake_index/share/ament_index/resource_index/rosidl_interfaces/extended_pose_interface
+msg/ExtendedPose.idl
+msg/ExtendedPose.msg
