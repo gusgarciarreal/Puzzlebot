@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 import rclpy                                  # ROS 2 Python client library.
 from rclpy.node import Node                   # Base class to create ROS 2 nodes.
+from rclpy import qos
 import math                                   # Library for mathematical functions.
 import time                                   # Module to handle delays and timestamps.
 from std_msgs.msg import Float32
+from nav_msgs.msg import Odometry
+import transforms3d
 
 # Import the ROS message type for velocity commands.
 from geometry_msgs.msg import Twist
@@ -15,6 +18,7 @@ class Controller(Node):
         # Initialize the node with the name 'controller'
         super().__init__('controller')
 
+        # Subscriptions
         # Create a subscription to the 'pose' topic where ExtendedPose messages are published.
         # This is the same topic on which the path_generator node publishes segments.
         self.subscription = self.create_subscription(
@@ -23,6 +27,7 @@ class Controller(Node):
             self.pose_callback,    # Callback function to process received messages.
             10                     # Queue size.
         )
+        self.sub_odom = self.create_subscription(Odometry,'odom',self.odom_callback, qos.qos_profile_sensor_data)
         
         # Create a publisher for the 'cmd_vel' topic to publish velocity commands to the robot.
         self.cmd_pub = self.create_publisher(Twist, 'cmd_vel', 10)
@@ -36,6 +41,18 @@ class Controller(Node):
         self.current_x = 0.0     # Current x-coordinate position of the robot.
         self.current_y = 0.0     # Current y-coordinate position of the robot.
         self.current_yaw = 0.0   # Current orientation (yaw angle in radians).
+
+    def odom_callback(self, msg):
+        self.current_x  = msg.pose.pose.position.x
+        self.current_y = msg.pose.pose.position.y
+
+        q = msg.pose.pose.orientation
+        quaternion = [q.w, q.x, q.y, q.z]
+        euler = transforms3d.euler.quat2euler(quaternion)
+
+        self.current_yaw = euler[2]
+
+        self.get_logger().info(f'Received odometry: X={self.current_x:.2f}, Y={self.current_y:.2f}, Yaw={ self.current_yaw:.2f}')
 
     def pose_callback(self, msg):
         """
@@ -66,32 +83,30 @@ class Controller(Node):
         delta_angle = target_yaw - self.current_yaw
         # Normalize the angle to be within the range of -pi to pi.
         delta_angle = math.atan2(math.sin(delta_angle), math.cos(delta_angle))
+
+        tolerance = 0.05  # Umbral de tolerancia en radianes
         
         # Check if rotation is needed by comparing against a small threshold.
-        if abs(delta_angle) > 0.01:
+        if abs(delta_angle) > tolerance:
             # Determine the direction of rotation using the angular velocity provided in the message.
             w = msg.angular_velocity if delta_angle >= 0 else -msg.angular_velocity
             self.angle_pub.publish(w)
-            
-            # Calculate the time required to perform the rotation.
-            t_rot = abs(delta_angle) / abs(msg.angular_velocity) if abs(msg.angular_velocity) > 0 else 0.0
-            self.get_logger().info(f"Rotating {delta_angle:.2f} rad for {t_rot:.2f} s")
             
             # Create a Twist message to command the rotation.
             twist = Twist()
             twist.linear.x = 0.0         # No linear movement during rotation.
             twist.angular.z = w          # Angular speed as computed.
             
-            # Execute the rotation for the computed duration.
-            start_time = time.time()
-            while (time.time() - start_time) < t_rot:
+            while abs(delta_angle) > tolerance:
                 self.cmd_pub.publish(twist)
-                time.sleep(0.1)          # Short sleep to allow repeated commands over time.
+                delta_angle = target_yaw - self.current_yaw # Actualizamos delta_angle en cada iteración
+                delta_angle = math.atan2(math.sin(delta_angle), math.cos(delta_angle))
+                time.sleep(0.05) # Short sleep to allow repeated commands over time.
+
+            self.get_logger().info(f"Rotación completada a {target_yaw:.2f} rad.")
             # After rotation, stop the robot.
             self.stop_robot()
-            
-            # Update the current orientation to match the target yaw.
-            self.current_yaw = target_yaw
+
         else:
             self.get_logger().info("Rotation not required.")
         
@@ -100,27 +115,22 @@ class Controller(Node):
         distance = math.sqrt((target_x - self.current_x)**2 + (target_y - self.current_y)**2)
         
         # Check if movement is needed based on distance.
-        if distance > 0.01:
-            # Calculate the time required to move straight to the target using the provided linear velocity.
-            t_lin = distance / msg.linear_velocity if msg.linear_velocity > 0 else 0.0
-            self.get_logger().info(f"Moving straight {distance:.2f} m for {t_lin:.2f} s")
+        if distance > tolerance:
             
             # Create a Twist message to command the linear movement.
             twist = Twist()
             twist.linear.x = msg.linear_velocity  # Set the forward speed.
             twist.angular.z = 0.0                  # No rotation during linear motion.
-            
-            # Execute the movement for the computed duration.
-            start_time = time.time()
-            while (time.time() - start_time) < t_lin:
+
+            while distance > tolerance:
                 self.cmd_pub.publish(twist)
-                time.sleep(0.1)          # Short sleep to allow repeated commands.
+                distance = math.sqrt((target_x - self.current_x)**2 + (target_y - self.current_y)**2)
+                time.sleep(0.05)          # Short sleep to allow repeated commands.
+
+            self.get_logger().info(f"Avance completado a X = {target_x:.2f} y Y = {target_y:.2f}")
             # After moving, stop the robot.
             self.stop_robot()
-            
-            # Update the robot's current position with the target coordinates.
-            self.current_x = target_x
-            self.current_y = target_y
+
         else:
             self.get_logger().info("Linear movement not required.")
 

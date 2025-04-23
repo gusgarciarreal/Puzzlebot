@@ -20,7 +20,7 @@ class DeadReckoning(Node):
         self.X = 0.0
         self.Y = 0.0
         self.Th = 0.0
-        self._l = 0.18
+        self._l = 0.19
         self._r = 0.05
         self._sample_time = 0.01
         self.rate = 200.0
