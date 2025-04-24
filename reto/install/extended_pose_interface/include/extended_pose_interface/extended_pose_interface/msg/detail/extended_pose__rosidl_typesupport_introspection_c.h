@@ -1,1 +1,0 @@
-/home/gusgm/sexto/Puzzlebot/reto/build/extended_pose_interface/rosidl_typesupport_introspection_c/extended_pose_interface/msg/detail/extended_pose__rosidl_typesupport_introspection_c.h
