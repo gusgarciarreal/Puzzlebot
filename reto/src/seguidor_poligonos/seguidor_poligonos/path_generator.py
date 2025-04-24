@@ -34,7 +34,7 @@ class PathGenerator(Node):
         self.current_segment = 0
 
         # --- Allow dynamic reconfiguration ---
-        self.add_on_set_parameters_callback(self._on_parameter_change)
+        self.add_on_set_parameters_callback(self.parameter_callback)
 
         self.get_logger().info("PathGenerator node started.")
 
@@ -54,7 +54,7 @@ class PathGenerator(Node):
             except Exception as e:
                 self.get_logger().error(f"Bad waypoints string: {e}")
                 raw = []
-        self.waypoints = raw
+        self.waypoints = [(float(x), float(y)) for (x, y) in raw]
 
     def _validate_waypoints(self):
         """Ensure we have at least two (x,y) pairs."""
@@ -91,7 +91,7 @@ class PathGenerator(Node):
                 for s in self.segments
             )
 
-    def _on_parameter_change(self, params):
+    def parameter_callback(self, params):
         """Recompute the route upon any relevant parameter update."""
         updated = False
         for p in params:
@@ -102,7 +102,16 @@ class PathGenerator(Node):
             self._validate_waypoints()
             self._compute_segments()
             self.current_segment = 0
-            self.get_logger().info("Parameters changed – segments recomputed.")
+            self.get_logger().info("Parameters changed - segments recomputed.")
+
+            # Reiniciar temporizador de publicación de segmentos
+            try:
+                self.timer.cancel()
+            except Exception:
+                pass
+            self.timer = self.create_timer(1.0, self._publish_next_segment)
+            self.get_logger().info("Timer restarted to replay path with updated parameters.")
+
         res = SetParametersResult()
         res.successful = True
         return res
@@ -118,8 +127,8 @@ class PathGenerator(Node):
         x, y = seg["end"]
         yaw = seg["desired_yaw"]
         msg = ExtendedPose()
-        msg.pose.position.x = x
-        msg.pose.position.y = y
+        msg.pose.position.x = float(x)
+        msg.pose.position.y = float(y)
         msg.pose.orientation.z = math.sin(yaw/2)
         msg.pose.orientation.w = math.cos(yaw/2)
 
@@ -128,8 +137,8 @@ class PathGenerator(Node):
             t_rot = abs(seg["delta_angle"])/self.user_w if self.user_w else 0.0
             t_lin = seg["distance"]/self.user_v if self.user_v else 0.0
             msg.linear_velocity = float(self.user_v)
-            msg.angular_velocity = math.copysign(
-                self.user_w, seg["delta_angle"])
+            msg.angular_velocity = float(math.copysign(
+                self.user_w, seg["delta_angle"]))
             msg.time_stamp = float(t_rot + t_lin)
 
         else:  # time mode
