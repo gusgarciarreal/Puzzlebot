@@ -110,6 +110,8 @@ class DeadReckoning(Node):
 
         self.odom_pub.publish(self.odom_msg)
 
+        self.get_logger().info(f"Position: X = {self.odom_msg.pose.pose.position.x:.2f} and Y = {self.odom_msg.pose.pose.position.y:.2f}")
+
 
 
     def stop_handler(self,signum, frame):
