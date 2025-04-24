@@ -1,0 +1,22 @@
+{
+    "python.autoComplete.extraPaths": [
+        "/home/gusgm/sexto/Puzzlebot/reto/build/seguidor_triangular_OLC",
+        "/home/edrick/sexto/Puzzlebot/reto/install/seguidor_triangular_OLC/lib/python3.10/site-packages",
+        "/home/gusgm/sexto/Puzzlebot/reto/build/seguidor_poligonos",
+        "/home/edrick/sexto/Puzzlebot/reto/install/seguidor_poligonos/lib/python3.10/site-packages",
+        "/home/gusgm/sexto/Puzzlebot/reto/build/interprete",
+        "/home/edrick/sexto/Puzzlebot/reto/install/interprete/lib/python3.10/site-packages",
+        "/opt/ros/humble/lib/python3.10/site-packages",
+        "/opt/ros/humble/local/lib/python3.10/dist-packages"
+    ],
+    "python.analysis.extraPaths": [
+        "/home/gusgm/sexto/Puzzlebot/reto/build/seguidor_triangular_OLC",
+        "/home/edrick/sexto/Puzzlebot/reto/install/seguidor_triangular_OLC/lib/python3.10/site-packages",
+        "/home/gusgm/sexto/Puzzlebot/reto/build/seguidor_poligonos",
+        "/home/edrick/sexto/Puzzlebot/reto/install/seguidor_poligonos/lib/python3.10/site-packages",
+        "/home/gusgm/sexto/Puzzlebot/reto/build/interprete",
+        "/home/edrick/sexto/Puzzlebot/reto/install/interprete/lib/python3.10/site-packages",
+        "/opt/ros/humble/lib/python3.10/site-packages",
+        "/opt/ros/humble/local/lib/python3.10/dist-packages"
+    ]
+}
