@@ -1,3 +1,0 @@
-[console_scripts]
-seguidor_triangular = seguidor_triangular_OLC.seguidor_triangular_OLC:main
-

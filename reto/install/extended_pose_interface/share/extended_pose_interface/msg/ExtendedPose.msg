@@ -1,4 +1,0 @@
-geometry_msgs/Pose pose
-float32 linear_velocity
-float32 angular_velocity
-float32 time_stamp

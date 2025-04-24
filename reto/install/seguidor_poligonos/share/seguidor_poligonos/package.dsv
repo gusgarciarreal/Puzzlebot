@@ -1,6 +1,0 @@
-source;share/seguidor_poligonos/hook/pythonpath.ps1
-source;share/seguidor_poligonos/hook/pythonpath.dsv
-source;share/seguidor_poligonos/hook/pythonpath.sh
-source;share/seguidor_poligonos/hook/ament_prefix_path.ps1
-source;share/seguidor_poligonos/hook/ament_prefix_path.dsv
-source;share/seguidor_poligonos/hook/ament_prefix_path.sh
