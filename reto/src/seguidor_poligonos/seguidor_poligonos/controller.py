@@ -1,134 +1,146 @@
 #!/usr/bin/env python3
+import math
 import rclpy                                  # ROS 2 Python client library.
-from rclpy.node import Node                   # Base class to create ROS 2 nodes.
-from rclpy import qos
-import math                                   # Library for mathematical functions.
-import time                                   # Module to handle delays and timestamps.
+from rclpy.node import Node                  # Base class to create ROS 2 nodes.
+from rclpy.duration import Duration          # Para duraciones en ROS 2
 from std_msgs.msg import Float32
 from nav_msgs.msg import Odometry
-
-# Import the ROS message type for velocity commands.
 from geometry_msgs.msg import Twist
-# Import the custom message type ExtendedPose from the extended_pose_interface package.
 from extended_pose_interface.msg import ExtendedPose
 
 class Controller(Node):
     def __init__(self):
-        # Initialize the node with the name 'controller'
         super().__init__('controller')
+        self.get_logger().info("Controller node started.")
 
-        # Subscriptions
-        # Create a subscription to the 'pose' topic where ExtendedPose messages are published.
-        # This is the same topic on which the path_generator node publishes segments.
-        self.subscription = self.create_subscription(
-            ExtendedPose,          # Message type expected on the topic.
-            'pose',                # The topic name.
-            self.pose_callback,    # Callback function to process received messages.
-            10                     # Queue size.
+        # Estado interno
+        self.current_x = 0.0
+        self.current_y = 0.0
+        self.current_yaw = 0.0
+
+        self.state = "IDLE"         # IDLE, MOVING
+        self.current_target = None
+        self.pose_queue = []        # Cola de mensajes ExtendedPose
+
+        # Suscripciones
+        self.create_subscription(
+            ExtendedPose,
+            'pose',
+            self.pose_callback,
+            10
         )
-        self.sub_odom = self.create_subscription(Odometry,'odom',self.odom_callback, qos.qos_profile_sensor_data)
-        
-        # Create a publisher for the 'cmd_vel' topic to publish velocity commands to the robot.
+        self.create_subscription(
+            Odometry,
+            'odom',
+            self.odom_callback,
+            qos_profile=rclpy.qos.qos_profile_sensor_data
+        )
+
+        # Publicador de comandos de velocidad
         self.cmd_pub = self.create_publisher(Twist, 'cmd_vel', 10)
 
-        # Create a publisher for the 'anglel' topic to debug
-        self.angle_pub = self.create_publisher(Float32, 'angle', 10)
+    def pose_callback(self, msg: ExtendedPose):
+        """Recibe un ExtendedPose y lo añade a la cola de objetivos."""
+        self.pose_queue.append(msg)
 
-        self.get_logger().info("Controller node started.")
-        
-        # Initialize the simulated robot state (current position and orientation).
-        self.current_x = 0.0     # Current x-coordinate position of the robot.
-        self.current_y = 0.0     # Current y-coordinate position of the robot.
-        self.current_yaw = 0.0   # Current orientation (yaw angle in radians).
-
-        # Initialize the range of error and the begin of state machine
-        self.tolerance = 0.05  # Umbral de tolerancia en radianes
-        self.state = "IDLE"  # It could be "IDLE", "ROTATING", "MOVING"
-        self.current_target = None
-
-        #Queue to manage data from ExtendedPose
-        self.pose_queue = []  
-
-    def odom_callback(self, msg):
-
+    def odom_callback(self, msg: Odometry):
+        """Procesa la odometría, actualiza estado y ejecuta control hacia el target."""
+        # Actualiza pose actual a partir de odometría
         q = msg.pose.pose.orientation
-            # Cálculo del ángulo yaw desde el cuaternión directamente
-        siny_cosp = 2.0 * (q.w * q.z + q.x * q.y)
-        cosy_cosp = 1.0 - 2.0 * (q.y * q.y + q.z * q.z)
-        yaw = math.atan2(siny_cosp, cosy_cosp)
-
-        self.current_yaw = yaw
-        self.current_x  = msg.pose.pose.position.x
+        siny = 2.0 * (q.w * q.z + q.x * q.y)
+        cosy = 1.0 - 2.0 * (q.y * q.y + q.z * q.z)
+        self.current_yaw = math.atan2(siny, cosy)
+        self.current_x = msg.pose.pose.position.x
         self.current_y = msg.pose.pose.position.y
 
-        self.get_logger().info(f'Received odometry: X={self.current_x:.2f}, Y={self.current_y:.2f}, Yaw={ self.current_yaw:.2f}')
+        self.get_logger().info(
+            f"Odometry → X={self.current_x:.2f}, Y={self.current_y:.2f}, Yaw={self.current_yaw:.2f}"
+        )
 
+        # Si estamos libres y hay objetivos pendientes, arrancamos el siguiente
         if self.state == "IDLE" and self.pose_queue:
-            self.current_target = self.pose_queue[0]
-            self.state = "ROTATING"
-        
-        if self.state == "ROTATING":
-            target_yaw = 2 * math.atan2(self.current_target.pose.orientation.z, self.current_target.pose.orientation.w) # Compute the target yaw from the quaternion.
-            delta_angle = target_yaw - self.current_yaw
-            delta_angle = math.atan2(math.sin(delta_angle), math.cos(delta_angle))
+            self.current_target = self.pose_queue.pop(0)
+            self.state = "MOVING"
 
-            if abs(delta_angle) > self.tolerance:
-                twist = Twist()
-                w = self.current_target.angular_velocity if delta_angle > 0 else -self.current_target.angular_velocity
-                twist.angular.z = w
-                self.cmd_pub.publish(twist)
-            else:
-                self.get_logger().info(f"Giro completado")
-                self.stop_robot()
-                self.state = "MOVING"
-        
-        if self.state == "MOVING":
-            target_x = self.current_target.pose.position.x
-            target_y = self.current_target.pose.position.y
-            distance = math.sqrt((target_x - self.current_x)**2 + (target_y - self.current_y)**2)
+        if self.state == "MOVING" and self.current_target is not None:
+            # Extrae target
+            tx = self.current_target.pose.position.x
+            ty = self.current_target.pose.position.y
+            q_t = self.current_target.pose.orientation
+            # Cálculo robusto de yaw objetivo desde cuaternión
+            siny_t = 2.0 * (q_t.w * q_t.z + q_t.x * q_t.y)
+            cosy_t = 1.0 - 2.0 * (q_t.y * q_t.y + q_t.z * q_t.z)
+            target_yaw = math.atan2(siny_t, cosy_t)
 
-            if distance > self.tolerance:
-                twist = Twist()
-                twist.linear.x = self.current_target.linear_velocity  # Set the forward speed.
-                twist.angular.z = 0.0                  # No rotation during linear motion.
-                self.cmd_pub.publish(twist)
+            v_cmd = self.current_target.linear_velocity
+            w_cmd = self.current_target.angular_velocity
+
+            # Banderas de finalización
+            flag_rotated = False
+            flag_translated = False
+
+            # 1) Rotación hacia yaw deseado
+            delta = self._normalize_angle(target_yaw - self.current_yaw)
+            if abs(delta) > 1e-2 and w_cmd != 0.0:
+                self._execute_motion(0.0, math.copysign(w_cmd, delta), 0.01)
             else:
-                self.get_logger().info(f"Avance completado a X = {target_x:.2f} y Y = {target_y:.2f}")
-                self.stop_robot()
-                self.pose_queue.pop(0)
+                flag_rotated = True
+                self.get_logger().info("Rotation skipped")
+
+            # 2) Traslación hacia posición deseada
+            dx = tx - self.current_x
+            dy = ty - self.current_y
+            dist = math.hypot(dx, dy)
+            if dist > 1e-2 and v_cmd > 0.0:
+                self._execute_motion(v_cmd, 0.0, 0.1)
+            else:
+                flag_translated = True
+                self.get_logger().info("Translation skipped")
+
+            # 3) Si ya rotamos y trasladamos, marcamos completado
+            if flag_rotated and flag_translated:
+                self.get_logger().info("Target reached → advancing to next")
                 self.current_target = None
                 self.state = "IDLE"
 
-
-    def pose_callback(self, msg):
-        self.pose_queue.append(msg)
-        self.get_logger().info("Nuevo waypoint recibido y agregado a la cola.")
-
-
-    def stop_robot(self):
+    def _execute_motion(self, lin_vel: float, ang_vel: float, duration: float):
         """
-        Sends a zero velocity command to stop all robot movements.
-        
-        This function publishes a Twist message with zero linear and angular velocities.
-        It then sleeps for a second to ensure the robot has come to a full stop.
+        Publica un Twist constante durante 'duration' segundos de forma no bloqueante
+        para el bucle principal de callbacks.
         """
         twist = Twist()
-        twist.linear.x = 0.0
-        twist.angular.z = 0.0
-        self.cmd_pub.publish(twist)
-        time.sleep(0.1)
+        twist.linear.x = lin_vel
+        twist.angular.z = ang_vel
+
+        # Convierte duration (float) a Duration(sec, nanosec)
+        sec = int(duration)
+        nanosec = int((duration - sec) * 1e9)
+        end_time = self.get_clock().now() + Duration(sec, nanosec)
+        sleep_step = Duration(0, int(0.01 * 1e9))
+
+        while self.get_clock().now() < end_time:
+            self.cmd_pub.publish(twist)
+            # Cede control a otros callbacks
+            self.get_clock().sleep_for(sleep_step)
+
+        # Para completamente
+        self.cmd_pub.publish(Twist())
+
+    @staticmethod
+    def _normalize_angle(angle: float) -> float:
+        """Envuelve un ángulo a [-π, π]."""
+        return math.atan2(math.sin(angle), math.cos(angle))
+
 
 def main(args=None):
-    # Initialize the ROS 2 Python client library.
     rclpy.init(args=args)
-    # Create an instance of the Controller node.
     node = Controller()
-    # Keep the node running to listen for messages and handle callbacks.
-    rclpy.spin(node)
-    # Cleanup on exit.
-    node.destroy_node()
-    rclpy.shutdown()
+    try:
+        rclpy.spin(node)
+    finally:
+        node.destroy_node()
+        rclpy.shutdown()
 
-# Execute the main function when the script is run directly.
+
 if __name__ == '__main__':
     main()

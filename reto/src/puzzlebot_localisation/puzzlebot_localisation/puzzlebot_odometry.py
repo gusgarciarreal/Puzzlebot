@@ -74,7 +74,7 @@ class DeadReckoning(Node):
         current_time = self.get_clock().now()
         dt = (current_time - self.last_time).nanoseconds * 1e-9  # Convert to seconds
         
-        if dt > self._sample_time:
+        if dt >= self._sample_time:
 
             #Wheel Tangential Velocities
             self.v_r = self._r  * self.wr.data
@@ -83,6 +83,11 @@ class DeadReckoning(Node):
             #Robot Velocities
             self.V = (1/2.0) * (self.v_r + self.v_l)
             self.Omega = (1.0/self._l) * (self.v_r - self.v_l)
+
+            # Update position and orientation (using a simple Euler integration)
+            self.X += self.V * math.cos(self.Th) * dt
+            self.Y += self.V * math.sin(self.Th) * dt
+            self.Th += self.Omega * dt
 
             self.last_time = current_time
 
