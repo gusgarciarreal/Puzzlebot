@@ -88,7 +88,7 @@ class Controller(Node):
 
             if distance > self.tolerance:
                 twist = Twist()
-                twist.linear.x = msg.linear_velocity  # Set the forward speed.
+                twist.linear.x = self.current_target.linear_velocity  # Set the forward speed.
                 twist.angular.z = 0.0                  # No rotation during linear motion.
                 self.cmd_pub.publish(twist)
             else:
@@ -97,6 +97,7 @@ class Controller(Node):
                 self.pose_queue.pop(0)
                 self.current_target = None
                 self.state = "IDLE"
+
 
     def pose_callback(self, msg):
         self.pose_queue.append(msg)
