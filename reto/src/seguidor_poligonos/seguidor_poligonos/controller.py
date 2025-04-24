@@ -6,7 +6,6 @@ import math                                   # Library for mathematical functio
 import time                                   # Module to handle delays and timestamps.
 from std_msgs.msg import Float32
 from nav_msgs.msg import Odometry
-import transforms3d
 
 # Import the ROS message type for velocity commands.
 from geometry_msgs.msg import Twist
@@ -53,10 +52,12 @@ class Controller(Node):
     def odom_callback(self, msg):
 
         q = msg.pose.pose.orientation
-        quaternion = [q.w, q.x, q.y, q.z]
-        euler = transforms3d.euler.quat2euler(quaternion)
+            # Cálculo del ángulo yaw desde el cuaternión directamente
+        siny_cosp = 2.0 * (q.w * q.z + q.x * q.y)
+        cosy_cosp = 1.0 - 2.0 * (q.y * q.y + q.z * q.z)
+        yaw = math.atan2(siny_cosp, cosy_cosp)
 
-        self.current_yaw = euler[2]
+        self.current_yaw = yaw
         self.current_x  = msg.pose.pose.position.x
         self.current_y = msg.pose.pose.position.y
 

@@ -1,7 +1,7 @@
 import rclpy
-import transforms3d
 import numpy as np
 import signal, os, time
+import math
 
 from rclpy import qos
 from rclpy.node import Node
@@ -16,7 +16,7 @@ class DeadReckoning(Node):
     def __init__(self):
         super().__init__('dead_reckoning')
 
-        #Set the parameters of the system
+        #Set the parameters of the systems
         self.X = 0.0
         self.Y = 0.0
         self.Th = 0.0
@@ -91,7 +91,10 @@ class DeadReckoning(Node):
 
     def publish_odometry(self):
         """ Publishes odometry message with updated state """
-        q1 = transforms3d.euler.euler2quat(0, 0, self.Th)
+        # Convert yaw (self.Th) to quaternion (assuming roll = pitch = 0)
+        cy = math.cos(self.Th * 0.5)
+        sy = math.sin(self.Th * 0.5)
+        q1 = (cy, 0.0, 0.0, sy)  # (w, x, y, z)
 
         self.odom_msg.header.stamp = self.get_clock().now().to_msg()
         self.odom_msg.header.frame_id = 'odom'
@@ -110,7 +113,9 @@ class DeadReckoning(Node):
 
         self.odom_pub.publish(self.odom_msg)
 
-        self.get_logger().info(f"Position: X = {self.odom_msg.pose.pose.position.x:.2f} and Y = {self.odom_msg.pose.pose.position.y:.2f}")
+        self.get_logger().info(
+        f"Position -> X: {self.X:.2f}, Y: {self.Y:.2f} | Orientation -> Yaw: {self.Th:.2f} rad | "
+        f"Quaternion -> x: 0.0, y: 0.0, z: {q1[3]:.4f}, w: {q1[0]:.4f}")
 
 
 
