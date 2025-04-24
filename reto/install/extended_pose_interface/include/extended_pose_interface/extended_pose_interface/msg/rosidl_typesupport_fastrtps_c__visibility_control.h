@@ -1,1 +1,0 @@
-/home/gusgm/sexto/Puzzlebot/reto/build/extended_pose_interface/rosidl_typesupport_fastrtps_c/extended_pose_interface/msg/rosidl_typesupport_fastrtps_c__visibility_control.h

@@ -1,1 +1,0 @@
-/home/gusgm/sexto/Puzzlebot/reto/src/extended_pose_interface/msg/ExtendedPose.msg

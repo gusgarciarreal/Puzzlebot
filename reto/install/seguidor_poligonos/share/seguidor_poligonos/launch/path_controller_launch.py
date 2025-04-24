@@ -1,1 +1,0 @@
-/home/gusgm/sexto/Puzzlebot/reto/build/seguidor_poligonos/launch/path_controller_launch.py
