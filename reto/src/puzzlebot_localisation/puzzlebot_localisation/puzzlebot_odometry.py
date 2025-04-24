@@ -1,151 +1,140 @@
-import rclpy
-import numpy as np
-import signal, os, time
 import math
+import signal
 
-from rclpy import qos
+import rclpy
 from rclpy.node import Node
+from rclpy.qos import qos_profile_sensor_data
 from std_msgs.msg import Float32
-from geometry_msgs.msg import TransformStamped
 from nav_msgs.msg import Odometry
-from tf2_ros import TransformBroadcaster
 
 
 class DeadReckoning(Node):
+    """ROS2 Node for computing 2D odometry via dead-reckoning from wheel encoder data."""
 
     def __init__(self):
         super().__init__('dead_reckoning')
 
-        #Set the parameters of the systems
-        self.X = 0.0
-        self.Y = 0.0
-        self.Th = 0.0
-        self._l = 0.19
-        self._r = 0.05
-        self._sample_time = 0.01
-        self.rate = 200.0
-                    
-        # Internal state
-        self.first = True
-        self.start_time = 0.0
-        self.current_time = 0.0
-        self.last_time = 0.0
+        # — Robot physical parameters —
+        self.wheel_radius = 0.05   # [m] wheel radius
+        self.wheel_base   = 0.19   # [m] distance between wheels
+        self.sample_time  = 0.01   # [s] minimum integration interval
+        self.rate_hz      = 200.0  # [Hz] timer frequency
 
-        #Variables to be used
-        self.v_r = 0.0
-        self.v_l = 0.0
-        self.V = 0.0
+        # — State variables —
+        self.x     = 0.0  # [m]  robot x-position
+        self.y     = 0.0  # [m]  robot y-position
+        self.theta = 0.0  # [rad] robot heading (yaw)
 
-        #Messages to be used
-        self.wr = Float32()
-        self.wl = Float32()
-        self.odom_msg = Odometry()
+        # — Wheel angular velocities (rad/s) —
+        self.wr = 0.0  # right wheel
+        self.wl = 0.0  # left wheel
 
-        # Subscriptions
-        self.sub_encR = self.create_subscription(Float32,'VelocityEncR',self.encR_callback,qos.qos_profile_sensor_data)
-        self.sub_encL = self.create_subscription(Float32,'VelocityEncL',self.encL_callback,qos.qos_profile_sensor_data)
-        
-        # Publishers
-        self.odom_pub = self.create_publisher(Odometry, 'odom', qos.qos_profile_sensor_data)
+        # Initialize last update time
+        self.last_time = self.get_clock().now()
 
-        # Timer to update kinematics at ~100Hz
-        self.timer = self.create_timer(1.0 / self.rate, self.run)  # 100 Hz
+        # — Subscriptions to encoder topics —
+        self.create_subscription(
+            Float32,
+            'VelocityEncR',
+            self._enc_r_callback,
+            qos_profile_sensor_data
+        )
+        self.create_subscription(
+            Float32,
+            'VelocityEncL',
+            self._enc_l_callback,
+            qos_profile_sensor_data
+        )
 
-        self.get_logger().info("Localisation Node Started.")
+        # — Publisher for computed odometry —
+        self.odom_pub = self.create_publisher(
+            Odometry,
+            'odom',
+            qos_profile_sensor_data
+        )
 
-    # Callbacks
-    def encR_callback(self, msg):
-        self.wr = msg
+        # — Timer to trigger periodic state updates —
+        self.create_timer(1.0 / self.rate_hz, self._update)
 
-    def encL_callback(self, msg):
-        self.wl = msg
+        # Graceful shutdown on Ctrl+C
+        signal.signal(signal.SIGINT, self._stop_handler)
 
-    def run(self):
+        self.get_logger().info("DeadReckoning node started.")
 
-        if self.first:
-            self.start_time = self.get_clock().now()
-            self.last_time = self.start_time
-            self.current_time = self.start_time
-            self.first = False
-            return
-        
-        """ Updates robot position based on real elapsed time """
-        # Get current time and compute dt
-        current_time = self.get_clock().now()
-        dt = (current_time - self.last_time).nanoseconds * 1e-9  # Convert to seconds
-        
-        if dt >= self._sample_time:
+    def _enc_r_callback(self, msg: Float32):
+        """Store latest right-wheel angular velocity."""
+        self.wr = msg.data
 
-            #Wheel Tangential Velocities
-            self.v_r = self._r  * self.wr.data
-            self.v_l = self._r  * self.wl.data
+    def _enc_l_callback(self, msg: Float32):
+        """Store latest left-wheel angular velocity."""
+        self.wl = msg.data
 
-            #Robot Velocities
-            self.V = (1/2.0) * (self.v_r + self.v_l)
-            self.Omega = (1.0/self._l) * (self.v_r - self.v_l)
+    def _update(self):
+        """Integrate pose if enough time has passed since last update."""
+        now = self.get_clock().now()
+        dt = (now - self.last_time).nanoseconds * 1e-9
+        if dt < self.sample_time:
+            return  # skip if too soon
 
-            # Update position and orientation (using a simple Euler integration)
-            self.X += self.V * math.cos(self.Th) * dt
-            self.Y += self.V * math.sin(self.Th) * dt
-            self.Th += self.Omega * dt
+        # Compute each wheel’s linear speed
+        vr = self.wheel_radius * self.wr
+        vl = self.wheel_radius * self.wl
 
-            self.last_time = current_time
+        # Robot’s forward and angular velocities
+        v     = 0.5 * (vr + vl)
+        omega = (vr - vl) / self.wheel_base
 
-            self.publish_odometry()
+        # Integrate into pose
+        self.theta += omega * dt
+        self.x     += v * math.cos(self.theta) * dt
+        self.y     += v * math.sin(self.theta) * dt
 
+        self.last_time = now
+        self._publish_odometry(v, omega)
 
-    def publish_odometry(self):
-        """ Publishes odometry message with updated state """
-        # Convert yaw (self.Th) to quaternion (assuming roll = pitch = 0)
-        cy = math.cos(self.Th * 0.5)
-        sy = math.sin(self.Th * 0.5)
-        q1 = (cy, 0.0, 0.0, sy)  # (w, x, y, z)
+    def _publish_odometry(self, linear_vel: float, angular_vel: float):
+        """Fill and publish an Odometry message with current pose and velocities."""
+        # Quaternion from yaw only (roll = pitch = 0)
+        qz = math.sin(self.theta * 0.5)
+        qw = math.cos(self.theta * 0.5)
 
-        self.odom_msg.header.stamp = self.get_clock().now().to_msg()
-        self.odom_msg.header.frame_id = 'odom'
-        self.odom_msg.child_frame_id = "base_footprint"
-        
-        self.odom_msg.pose.pose.position.x = self.X
-        self.odom_msg.pose.pose.position.y = self.Y
-        self.odom_msg.pose.pose.position.z = 0.0
-        self.odom_msg.pose.pose.orientation.x = q1[1]
-        self.odom_msg.pose.pose.orientation.y = q1[2]
-        self.odom_msg.pose.pose.orientation.z = q1[3]
-        self.odom_msg.pose.pose.orientation.w = q1[0]
-    
-        self.odom_msg.twist.twist.linear.x = self.V
-        self.odom_msg.twist.twist.angular.z = self.Omega
+        odom = Odometry()
+        odom.header.stamp = self.get_clock().now().to_msg()
+        odom.header.frame_id    = 'odom'
+        odom.child_frame_id     = 'base_footprint'
 
-        self.odom_pub.publish(self.odom_msg)
+        # Pose
+        odom.pose.pose.position.x    = self.x
+        odom.pose.pose.position.y    = self.y
+        odom.pose.pose.position.z    = 0.0
+        odom.pose.pose.orientation.x = 0.0
+        odom.pose.pose.orientation.y = 0.0
+        odom.pose.pose.orientation.z = qz
+        odom.pose.pose.orientation.w = qw
 
-        self.get_logger().info(
-        f"Position -> X: {self.X:.2f}, Y: {self.Y:.2f} | Orientation -> Yaw: {self.Th:.2f} rad | "
-        f"Quaternion -> x: 0.0, y: 0.0, z: {q1[3]:.4f}, w: {q1[0]:.4f}")
+        # Twist
+        odom.twist.twist.linear.x   = linear_vel
+        odom.twist.twist.angular.z  = angular_vel
 
+        self.odom_pub.publish(odom)
+        # Use debug level to avoid flooding logs at high rate
+        self.get_logger().debug(
+            f"Pose → x: {self.x:.3f}, y: {self.y:.3f}, θ: {self.theta:.3f} | "
+            f"v: {linear_vel:.3f}, ω: {angular_vel:.3f}"
+        )
 
-
-    def stop_handler(self,signum, frame):
-        """Handles Ctrl+C (SIGINT)."""
-        self.get_logger().info("Interrupt received! Stopping node...")
-        raise SystemExit
-
+    def _stop_handler(self, signum, frame):
+        """Cleanly shut down on SIGINT."""
+        self.get_logger().info("Shutdown signal received, exiting.")
+        rclpy.shutdown()
 
 
 def main(args=None):
-
     rclpy.init(args=args)
-
     node = DeadReckoning()
+    rclpy.spin(node)
+    node.destroy_node()
 
-    signal.signal(signal.SIGINT, node.stop_handler)
-
-    try:
-        rclpy.spin(node)
-    except SystemExit:
-        node.get_logger().info('SystemExit triggered. Shutting down cleanly.')
-    finally:
-        node.destroy_node()
-        rclpy.shutdown()
 
 if __name__ == '__main__':
     main()
