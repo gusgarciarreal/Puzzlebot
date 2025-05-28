@@ -16,7 +16,7 @@ class LineFollowerCombined(Node):
         self.sub_img = self.create_subscription(
             Image, "/pre_processed_cam", self.img_callback, qos
         )
-        self.pub_cmd = self.create_publisher(Twist, "/cmd_vel", 10)
+        self.pub_cmd = self.create_publisher(Twist, "/line_follower/raw_cmd_vel", 10)
         self.pub_debug = self.create_publisher(Image, "/line_follower/debug", 10)
 
         self.bridge = CvBridge()
