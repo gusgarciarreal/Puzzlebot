@@ -80,10 +80,10 @@ class TrafficLightDetectorNode(Node):
             return # Publicado verde
 
         # Si no se detectó ningún color específico, publica el estado por defecto (3 = rojo)
-        default_status_msg = Int32()
-        default_status_msg.data = 3 # Rojo por defecto
-        self.status_publisher.publish(default_status_msg)
-        self.get_logger().debug('No specific light detected, publishing default status: 3 (Red)')
+        # default_status_msg = Int32()
+        # default_status_msg.data = 3 # Rojo por defecto
+        # self.status_publisher.publish(default_status_msg)
+        # self.get_logger().debug('No specific light detected, publishing default status: 3 (Red)')
 
 
     def apply_morphology(self, mask):
