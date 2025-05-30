@@ -29,27 +29,25 @@ class LineFollowerCombined(Node):
         # Dimensiones de imagen esperadas
         self.h, self.w = 240, 320
 
-        # Generar una máscara de región de interés triangular erosionada para la ROI
-        self.tri_mask_eroded = self.build_eroded_triangle_mask(
-            self.w, self.h, kernel_size=7
-        )
+        # Generar una máscara de región de interés triangular para la ROI
+        # MODIFICADO: Ya no se usa la versión erosionada
+        self.tri_mask = self.build_triangle_mask(self.w, self.h)
 
-    def build_eroded_triangle_mask(
-        self, w: int, h: int, kernel_size: int = 7
-    ) -> np.ndarray:
+    # MODIFICADO: Nombre de la función y eliminación de la erosión
+    def build_triangle_mask(self, w: int, h: int) -> np.ndarray:
         """
-        Construye una máscara de imagen binaria (uint8) con forma de triángulo que cubre el campo de visión inferior,
-        luego erosiona sus bordes para evitar falsas detecciones en los límites de la ROI.
+        Construye una máscara de imagen binaria (uint8) con forma de triángulo que cubre el campo de visión inferior.
         Vértices del triángulo: inferior-izquierda, inferior-derecha y punto medio a la mitad de la altura.
         """
         mask = np.zeros((h, w), dtype=np.uint8)
         pts = np.array([[(0, h - 1), (w - 1, h - 1), (w // 2, h // 2)]], dtype=np.int32)
         cv2.fillPoly(mask, pts, 255)
 
-        # Aplicar erosión morfológica para encoger los límites de la ROI según el tamaño del kernel
-        kernel = np.ones((kernel_size, kernel_size), np.uint8)
-        eroded_mask = cv2.erode(mask, kernel, iterations=1)
-        return eroded_mask
+        # ELIMINADO: Código de erosión
+        # kernel = np.ones((kernel_size, kernel_size), np.uint8)
+        # eroded_mask = cv2.erode(mask, kernel, iterations=1)
+        # return eroded_mask
+        return mask  # Devolver la máscara original sin erosionar
 
     def img_callback(self, msg: Image):
         # Convertir ROS Image entrante a OpenCV BGR
@@ -64,7 +62,8 @@ class LineFollowerCombined(Node):
         )  # Máscara binaria para píxeles oscuros (negros)
 
         # Restringir la detección a la región de interés triangular precalculada
-        mask_roi = cv2.bitwise_and(mask_black, self.tri_mask_eroded)
+        # MODIFICADO: Usar la máscara no erosionada
+        mask_roi = cv2.bitwise_and(mask_black, self.tri_mask)
 
         # Realizar dilatación para rellenar huecos dentro de la máscara de línea binaria
         kernel_dilate = np.ones((3, 3), np.uint8)
@@ -155,10 +154,10 @@ class LineFollowerCombined(Node):
                 # posicion de texto centrado abajo
                 (20, self.h - 20),
                 cv2.FONT_HERSHEY_SIMPLEX,
-                0.6, # tamaño de fuente
-                (0, 0, 255), # color rojo
-                2, # grosor de la línea
-                cv2.LINE_AA, # tipo de línea
+                0.6,  # tamaño de fuente
+                (0, 0, 255),  # color rojo
+                2,  # grosor de la línea
+                cv2.LINE_AA,  # tipo de línea
             )
 
         # Publicar comando de velocidad calculado al controlador del robot
