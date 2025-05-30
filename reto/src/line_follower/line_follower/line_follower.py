@@ -23,14 +23,13 @@ class LineFollowerCombined(Node):
         self.prev_err = 0.0
 
         # Configurar ganancias del controlador PID (kp, kd) e intervalo del bucle de control (dt)
-        self.kp, self.kd = 0.009, 0.003  # Constantes PID consistentes: 0.005 y 0.002
+        self.kp, self.kd = 0.006, 0.001  # Constantes PID consistentes: 0.005 y 0.002
         self.dt = 0.1  # (10 Hz)
 
         # Dimensiones de imagen esperadas
         self.h, self.w = 240, 320
 
         # Generar una máscara de región de interés triangular para la ROI
-        # MODIFICADO: Ya no se usa la versión erosionada
         self.tri_mask = self.build_triangle_mask(self.w, self.h)
 
     # MODIFICADO: Nombre de la función y eliminación de la erosión
@@ -40,7 +39,7 @@ class LineFollowerCombined(Node):
         Vértices del triángulo: inferior-izquierda, inferior-derecha y punto medio a la mitad de la altura.
         """
         mask = np.zeros((h, w), dtype=np.uint8)
-        pts = np.array([[(0, h - 1), (w - 1, h - 1), (w // 2, h // 2)]], dtype=np.int32)
+        pts = np.array([[(50, h - 1), (w - 50, h - 1), (w // 2, h // 2)]], dtype=np.int32)
         cv2.fillPoly(mask, pts, 255)
 
         # ELIMINADO: Código de erosión
@@ -108,7 +107,7 @@ class LineFollowerCombined(Node):
                 omega = np.clip(omega, -0.6, 0.6)
 
                 # Establecer velocidad lineal hacia adelante y velocidad angular calculada
-                cmd.linear.x = 0.05 if abs(err) > 20 else 0.09
+                cmd.linear.x = 0.04 if abs(err) > 15 else 0.08
                 cmd.linear.y = 0.0
                 cmd.linear.z = 0.0
                 cmd.angular.x = 0.0
@@ -165,7 +164,7 @@ class LineFollowerCombined(Node):
 
         # Dibujar el contorno original de la ROI triangular para depuración
         pts_roi_visualization = np.array(
-            [[(0, self.h - 1), (self.w - 1, self.h - 1), (self.w // 2, self.h // 2)]],
+            [[(50, self.h - 1), (self.w - 50, self.h - 1), (self.w // 2, self.h // 2)]],
             dtype=np.int32,
         )
         cv2.polylines(
