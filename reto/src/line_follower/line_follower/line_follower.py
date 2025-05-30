@@ -7,9 +7,9 @@ import cv2
 import numpy as np
 
 
-class LineFollowerCombined(Node):
+class LineFollower(Node):
     def __init__(self):
-        super().__init__("line_follower_combined")
+        super().__init__("line_follower")
 
         # Inicializar suscriptor ROS a /pre_processed_cam, publicador para velocidades e imagen de depuración
         qos = rclpy.qos.qos_profile_sensor_data
@@ -23,30 +23,39 @@ class LineFollowerCombined(Node):
         self.prev_err = 0.0
 
         # Configurar ganancias del controlador PID (kp, kd) e intervalo del bucle de control (dt)
-        self.kp, self.kd = 0.006, 0.001  # Constantes PID consistentes: 0.005 y 0.002
+        self.kp, self.kd = 0.007, 0.001  # Constantes PID consistentes: 0.005 y 0.002
         self.dt = 0.1  # (10 Hz)
 
         # Dimensiones de imagen esperadas
         self.h, self.w = 240, 320
 
         # Generar una máscara de región de interés triangular para la ROI
-        self.tri_mask = self.build_triangle_mask(self.w, self.h)
+        self.tri_mask = self.build_triangle_mask(
+            self.w, self.h, erosion_kernel_size=5
+        )
 
-    # MODIFICADO: Nombre de la función y eliminación de la erosión
-    def build_triangle_mask(self, w: int, h: int) -> np.ndarray:
+    def build_triangle_mask(
+        self, w: int, h: int, erosion_kernel_size: int = 5
+    ) -> np.ndarray:
         """
         Construye una máscara de imagen binaria (uint8) con forma de triángulo que cubre el campo de visión inferior.
         Vértices del triángulo: inferior-izquierda, inferior-derecha y punto medio a la mitad de la altura.
+        Aplica una erosión a la máscara.
         """
         mask = np.zeros((h, w), dtype=np.uint8)
-        pts = np.array([[(50, h - 1), (w - 50, h - 1), (w // 2, h // 2)]], dtype=np.int32)
+        pts = np.array(
+            [[(50, h - 1), (w - 50, h - 1), (w // 2, h // 2)]], dtype=np.int32
+        )
         cv2.fillPoly(mask, pts, 255)
 
-        # ELIMINADO: Código de erosión
-        # kernel = np.ones((kernel_size, kernel_size), np.uint8)
-        # eroded_mask = cv2.erode(mask, kernel, iterations=1)
-        # return eroded_mask
-        return mask  # Devolver la máscara original sin erosionar
+        # APLICAR EROSIÓN
+        if erosion_kernel_size > 0:
+            kernel = np.ones((erosion_kernel_size, erosion_kernel_size), np.uint8)
+            eroded_mask = cv2.erode(mask, kernel, iterations=1)
+            return eroded_mask
+        return (
+            mask  # Devolver la máscara original si erosion_kernel_size es 0 o negativo
+        )
 
     def img_callback(self, msg: Image):
         # Convertir ROS Image entrante a OpenCV BGR
@@ -61,7 +70,7 @@ class LineFollowerCombined(Node):
         )  # Máscara binaria para píxeles oscuros (negros)
 
         # Restringir la detección a la región de interés triangular precalculada
-        # MODIFICADO: Usar la máscara no erosionada
+        # AHORA se usa la máscara erosionada (o no, según se configuró en __init__)
         mask_roi = cv2.bitwise_and(mask_black, self.tri_mask)
 
         # Realizar dilatación para rellenar huecos dentro de la máscara de línea binaria
@@ -186,7 +195,7 @@ class LineFollowerCombined(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-    node = LineFollowerCombined()
+    node = LineFollower()
     rclpy.spin(node)
     node.destroy_node()
     rclpy.shutdown()
