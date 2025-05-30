@@ -23,7 +23,7 @@ class LineFollowerCombined(Node):
         self.prev_err = 0.0
 
         # Configurar ganancias del controlador PID (kp, kd) e intervalo del bucle de control (dt)
-        self.kp, self.kd = 0.007, 0.002  # Constantes PID consistentes: 0.005 y 0.002
+        self.kp, self.kd = 0.009, 0.003  # Constantes PID consistentes: 0.005 y 0.002
         self.dt = 0.1  # (10 Hz)
 
         # Dimensiones de imagen esperadas
@@ -58,7 +58,7 @@ class LineFollowerCombined(Node):
         # PASO 1: Aislar áreas potenciales de línea mediante umbralización de regiones oscuras
         hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
         mask_black = cv2.inRange(
-            hsv, (0, 0, 0), (180, 255, 60)
+            hsv, (0, 0, 0), (180, 255, 70)
         )  # Máscara binaria para píxeles oscuros (negros)
 
         # Restringir la detección a la región de interés triangular precalculada
@@ -108,7 +108,7 @@ class LineFollowerCombined(Node):
                 omega = np.clip(omega, -0.6, 0.6)
 
                 # Establecer velocidad lineal hacia adelante y velocidad angular calculada
-                cmd.linear.x = 0.05 if abs(err) > 17 else 0.11
+                cmd.linear.x = 0.05 if abs(err) > 20 else 0.09
                 cmd.linear.y = 0.0
                 cmd.linear.z = 0.0
                 cmd.angular.x = 0.0
