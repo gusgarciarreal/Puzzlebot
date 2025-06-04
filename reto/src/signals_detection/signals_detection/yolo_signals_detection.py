@@ -19,7 +19,7 @@ class Camera_subscriber(Node):
         super().__init__('camera_subscriber')
 
         # Assuming bestvol2.pt is correctly installed and located as per your previous fix.
-        self.model = YOLO('/home/ggm/Documents/sexto/Puzzlebot/reto/src/YOLO/YOLO/best.pt')
+        self.model = YOLO('/home/ggm/Documents/sexto/Puzzlebot/reto/src/signals_detection/signals_detection/bestvol2.pt')
 
         self.yolov8_inference = Yolov8Inference()
 
@@ -36,7 +36,7 @@ class Camera_subscriber(Node):
     def camera_callback(self, data):
         img = bridge.imgmsg_to_cv2(data, "bgr8")
 
-        results = self.model(source = img, show=False, conf=0.5, save=False, imgsz=640)
+        results = self.model(source = img, show=False, conf=0.5, save=False, imgsz=320)
         # annotator = SolutionAnnotator(img) # This line is not used if results[0].plot() handles annotation
 
         boxes = results[0].boxes.xyxy.cpu()
@@ -61,6 +61,14 @@ class Camera_subscriber(Node):
             self.inference_result.left = int(x1)   # x1 is left
             self.inference_result.bottom = int(y2) # y2 is bottom
             self.inference_result.right = int(x2)  # x2 is right
+            
+            # Area calculation
+            height = int(y2) - int(y1)
+            width = int(x2) - int(x1)
+            area = height * width
+            self.inference_result.area = int(area)
+
+            self.yolov8_inference.yolov8_inference.append(self.inference_result)
 
             self.yolov8_inference.yolov8_inference.append(self.inference_result)
 
