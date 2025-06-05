@@ -4,7 +4,7 @@ from rclpy.duration import Duration
 from sensor_msgs.msg import Image
 from geometry_msgs.msg import Twist
 from std_msgs.msg import Bool
-from cv_bridge import CvBridge
+from cv_bridge import CvBridge, CvBridgeError
 import cv2
 import numpy as np
 
@@ -19,6 +19,50 @@ class LineFollower(Node):
 
     def __init__(self):
         super().__init__("line_follower")
+
+        # Declare and get ROS2 parameters for configuration
+        self.declare_parameter('kp', 0.008)
+        self.declare_parameter('kd', 0.001)
+        self.declare_parameter('dt', 0.1) # PID update rate, should match image topic rate
+        self.declare_parameter('image_height', 240)
+        self.declare_parameter('image_width', 320)
+        self.declare_parameter('canny_sigma', 0.33) # Common value for adaptive Canny
+        self.declare_parameter('line_timeout_seconds', 1.0)
+        self.declare_parameter('linear_speed', 0.09)
+        self.declare_parameter('angular_speed_limit', 0.8)
+        self.declare_parameter('linear_speed_error_factor', 0.01)
+        self.declare_parameter('min_line_angle_deg', 25.0)
+        self.declare_parameter('max_line_angle_deg', 155.0)
+        self.declare_parameter('hough_threshold', 30)
+        self.declare_parameter('hough_min_line_length', 15)
+        self.declare_parameter('hough_max_line_gap', 13)
+        self.declare_parameter('roi_bottom_width_offset', 50)
+        self.declare_parameter('clahe_clip_limit', 2.0)
+        self.declare_parameter('clahe_tile_grid_size', [8, 8])
+        self.declare_parameter('gaussian_blur_kernel_size', [17, 17])
+        self.declare_parameter('gaussian_blur_sigma_x', 2.0)
+
+
+        # Assign parameters to class attributes
+        self.kp = self.get_parameter('kp').value
+        self.kd = self.get_parameter('kd').value
+        self.dt = self.get_parameter('dt').value
+        self.h = self.get_parameter('image_height').value
+        self.w = self.get_parameter('image_width').value
+        self.canny_sigma = self.get_parameter('canny_sigma').value
+        self.line_timeout_duration = Duration(seconds=self.get_parameter('line_timeout_seconds').value)
+        self.linear_speed = self.get_parameter('linear_speed').value
+        self.angular_speed_limit = self.get_parameter('angular_speed_limit').value
+        self.linear_speed_error_factor = self.get_parameter('linear_speed_error_factor').value
+        self.min_line_angle_deg = self.get_parameter('min_line_angle_deg').value
+        self.max_line_angle_deg = self.get_parameter('max_line_angle_deg').value
+        self.hough_threshold = self.get_parameter('hough_threshold').value
+        self.hough_min_line_length = self.get_parameter('hough_min_line_length').value
+        self.hough_max_line_gap = self.get_parameter('hough_max_line_gap').value
+        self.roi_bottom_width_offset = self.get_parameter('roi_bottom_width_offset').value
+        clahe_tile_grid_size = self.get_parameter('clahe_tile_grid_size').value
+        gaussian_blur_kernel_size = self.get_parameter('gaussian_blur_kernel_size').value
+        gaussian_blur_sigma_x = self.get_parameter('gaussian_blur_sigma_x').value
 
         # ROS2 publishers and subscribers configuration
         qos = rclpy.qos.qos_profile_sensor_data
@@ -36,23 +80,32 @@ class LineFollower(Node):
         self.bridge = CvBridge()
         self.prev_err = 0.0
 
-        # PID controller gains
-        self.kp, self.kd = 0.008, 0.001
-        self.dt = 0.1
-
-        # Expected image dimensions (height, width)
-        self.h, self.w = 240, 320
-
         # Region of Interest (ROI) mask
         self.tri_mask = self.build_triangle_mask(self.w, self.h)
 
         # Adaptive contrast enhancement object (CLAHE)
-        self.clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+        self.clahe = cv2.createCLAHE(
+            clipLimit=self.get_parameter('clahe_clip_limit').value,
+            tileGridSize=tuple(clahe_tile_grid_size)
+        )
+        self.gaussian_blur_kernel_size = tuple(gaussian_blur_kernel_size)
+        self.gaussian_blur_sigma_x = gaussian_blur_sigma_x
 
         # Variables for line status publisher
-        self.line_timeout_duration = Duration(seconds=1.0)
         self.last_line_seen_time = self.get_clock().now()
         self.line_currently_detected_flag = False
+
+        # Pre-calculate ROI visualization points (Avoid Redundant Calculations)
+        self.roi_visualization_pts = np.array(
+            [
+                [
+                    (self.roi_bottom_width_offset, self.h - 1),
+                    (self.w - self.roi_bottom_width_offset, self.h - 1),
+                    (self.w // 2, self.h // 2),
+                ]
+            ],
+            dtype=np.int32,
+        )
 
         # Publish initial status (False)
         self._publish_line_status()
@@ -71,20 +124,28 @@ class LineFollower(Node):
         mask = np.zeros((h, w), dtype=np.uint8)
         # Defines the triangle vertices for the ROI
         pts = np.array(
-            [[(50, h - 1), (w - 50, h - 1), (w // 2, h // 2)]], dtype=np.int32
+            [
+                [
+                    (self.roi_bottom_width_offset, h - 1),
+                    (w - self.roi_bottom_width_offset, h - 1),
+                    (w // 2, h // 2),
+                ]
+            ],
+            dtype=np.int32,
         )
         cv2.fillPoly(mask, pts, 255)
 
         return mask
 
-    def get_adaptive_canny_thresholds(self, image: np.ndarray, sigma: float = 0.05):
+    def get_adaptive_canny_thresholds(self, image: np.ndarray):
         """
         Calculates adaptive thresholds for Canny edge detection
         based on the image intensity median.
+        Uses a configurable sigma value.
         """
         median = np.median(image)
-        lower = int(max(0, (1.0 - sigma) * median))
-        upper = int(min(255, (1.0 + sigma) * median))
+        lower = int(max(0, (1.0 - self.canny_sigma) * median))
+        upper = int(min(255, (1.0 + self.canny_sigma) * median))
         return lower, upper
 
     def _preprocess_image(self, frame: np.ndarray) -> np.ndarray:
@@ -99,7 +160,11 @@ class LineFollower(Node):
         clahe_output = self.clahe.apply(gray)
 
         # Blurs the image before Canny edge detection to reduce noise.
-        blurred_image = cv2.GaussianBlur(clahe_output, (17, 17), 2)
+        blurred_image = cv2.GaussianBlur(
+            clahe_output,
+            self.gaussian_blur_kernel_size,
+            self.gaussian_blur_sigma_x
+        )
 
         # Detects edges using the Canny algorithm with adaptive thresholds.
         lower_canny, upper_canny = self.get_adaptive_canny_thresholds(blurred_image)
@@ -114,21 +179,23 @@ class LineFollower(Node):
         """
         Detects lines in the edge image using the Hough Transform
         and calculates the average center of detected lines that meet the criteria.
+        Prioritizes up to two valid lines.
         """
         lines = cv2.HoughLinesP(
             edges,
             rho=1,
             theta=np.pi / 180,
-            threshold=30,
-            minLineLength=15,
-            maxLineGap=13,
+            threshold=self.hough_threshold,
+            minLineLength=self.hough_min_line_length,
+            maxLineGap=self.hough_max_line_gap,
         )
 
         avg_line_center_x = None
         valid_lines_for_drawing = []
+        candidate_mid_x_coords = []
 
         if lines is not None:
-            candidate_mid_x_coords = []
+            # Process lines and filter them
             for line_arr in lines:
                 x1, y1, x2, y2 = line_arr[0]
 
@@ -137,11 +204,17 @@ class LineFollower(Node):
                 angle_deg = np.degrees(angle_rad)
 
                 # Filters lines that are too horizontal.
-                if abs(angle_deg) < 25 or abs(angle_deg) > 155:
+                if abs(angle_deg) < self.min_line_angle_deg or abs(angle_deg) > self.max_line_angle_deg:
                     continue
 
                 candidate_mid_x_coords.append((x1 + x2) / 2.0)
                 valid_lines_for_drawing.append(((x1, y1), (x2, y2)))
+
+                # Optimize Line Detection: Limit to up to 2 candidates
+                # This ensures we don't process too many lines if not needed,
+                # focusing on the most prominent ones.
+                if len(candidate_mid_x_coords) >= 2:
+                    break
 
             if candidate_mid_x_coords:
                 avg_line_center_x = np.mean(candidate_mid_x_coords)
@@ -160,11 +233,11 @@ class LineFollower(Node):
         derr = (err - self.prev_err) / self.dt
         # Calculates angular velocity using the PD controller.
         omega = -(self.kp * err + self.kd * derr)
-        omega = np.clip(omega, -0.8, 0.8)
+        omega = np.clip(omega, -self.angular_speed_limit, self.angular_speed_limit)
 
         # Dynamically adjusts linear speed: slower on sharp turns.
-        linear_speed_factor = max(0.2, 1.0 - 0.01 * abs(err))
-        cmd.linear.x = 0.09 * linear_speed_factor
+        linear_speed_factor = max(0.2, 1.0 - self.linear_speed_error_factor * abs(err))
+        cmd.linear.x = self.linear_speed * linear_speed_factor
 
         cmd.angular.z = omega
         self.prev_err = err
@@ -178,8 +251,11 @@ class LineFollower(Node):
             debug_msg = self.bridge.cv2_to_imgmsg(dbg_image, encoding="bgr8")
             debug_msg.header = original_msg_header
             self.pub_debug.publish(debug_msg)
-        except Exception as e:
+        except CvBridgeError as e:
             self.get_logger().error(f"Error converting debug image: {e}")
+        except Exception as e:
+            self.get_logger().error(f"Unexpected error publishing debug image: {e}")
+
 
     def img_callback(self, msg: Image):
         """
@@ -198,15 +274,37 @@ class LineFollower(Node):
                 frame = cv2.resize(
                     frame, (self.w, self.h), interpolation=cv2.INTER_AREA
                 )
-        except Exception as e:
-            self.get_logger().error(f"Error converting image: {e}")
+        except CvBridgeError as e:
+            self.get_logger().error(f"CvBridge error converting image: {e}")
             # Even if there's an image error, check for timeout
             if self.line_currently_detected_flag:
                 time_since_last_seen = current_time - self.last_line_seen_time
                 if time_since_last_seen >= self.line_timeout_duration:
                     self.line_currently_detected_flag = False
+                    self.get_logger().info("Line lost due to image error and timeout.")
             self._publish_line_status()
             return
+        except Exception as e:
+            self.get_logger().error(f"Unexpected error processing image: {e}")
+            if self.line_currently_detected_flag:
+                time_since_last_seen = current_time - self.last_line_seen_time
+                if time_since_last_seen >= self.line_timeout_duration:
+                    self.line_currently_detected_flag = False
+                    self.get_logger().info("Line lost due to image error and timeout.")
+            self._publish_line_status()
+            return
+
+        # Defensive programming: Check if frame is valid after conversion
+        if frame is None or frame.size == 0:
+            self.get_logger().warn("Received empty or invalid image frame.")
+            if self.line_currently_detected_flag:
+                time_since_last_seen = current_time - self.last_line_seen_time
+                if time_since_last_seen >= self.line_timeout_duration:
+                    self.line_currently_detected_flag = False
+                    self.get_logger().info("Line lost due to empty frame and timeout.")
+            self._publish_line_status()
+            return
+
 
         dbg_image = frame.copy()
 
@@ -226,13 +324,13 @@ class LineFollower(Node):
 
             # Draws detected lines and reference point on the debug image.
             for p1, p2 in valid_lines_for_drawing:
-                cv2.line(dbg_image, p1, p2, (0, 255, 0), 2)
+                cv2.line(dbg_image, p1, p2, (0, 255, 0), 1)
 
-            ref_y_for_center_dot = int(self.h * 0.85)
+            ref_y_for_center_dot = int(self.h * 0.85) # Y at 85% of img height
             cv2.circle(
                 dbg_image,
                 (int(avg_line_center_x), ref_y_for_center_dot),
-                7,
+                5, # Magic Number for circle radius
                 (0, 255, 0),
                 -1,
             )
@@ -254,11 +352,11 @@ class LineFollower(Node):
             cv2.putText(
                 dbg_image,
                 "No line detected",
-                (20, self.h - 20),
+                (20, self.h - 20), # Text position
                 cv2.FONT_HERSHEY_SIMPLEX,
-                0.6,
+                0.6, # Font scale
                 (0, 0, 255),
-                2,
+                2, # Thickness
                 cv2.LINE_AA,
             )
 
@@ -275,23 +373,17 @@ class LineFollower(Node):
                     self.line_currently_detected_flag = False
                     self.get_logger().info("Line lost due to timeout.")
 
-        # Publish if the status changed or if it's currently detected.
+        # Publish if the status changed.
         if previous_flag_state != self.line_currently_detected_flag:
             self._publish_line_status()
-        # elif self.line_currently_detected_flag:
-        #     self._publish_line_status()
 
         # Publishes velocity commands for the robot.
         self.pub_cmd.publish(cmd)
 
-        # Draws the ROI contour.
-        pts_roi_visualization = np.array(
-            [[(50, self.h - 1), (self.w - 50, self.h - 1), (self.w // 2, self.h // 2)]],
-            dtype=np.int32,
-        )
+        # Draws the ROI contour (Avoid Redundant Calculations)
         cv2.polylines(
             dbg_image,
-            pts_roi_visualization,
+            self.roi_visualization_pts,
             isClosed=True,
             color=(0, 255, 255),
             thickness=1,
