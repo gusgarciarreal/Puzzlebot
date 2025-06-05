@@ -42,6 +42,7 @@ class Camera_subscriber(Node):
         # iou is the IoU threshold for non-max suppression
         # it is used to filter out overlapping bounding boxes based on their Intersection over Union (IoU) score.
         # so if two boxes overlap significantly, the one with the lower confidence score will be removed.
+        
         # annotator = SolutionAnnotator(img) # This line is not used if results[0].plot() handles annotation
 
         boxes = results[0].boxes.xyxy.cpu()
