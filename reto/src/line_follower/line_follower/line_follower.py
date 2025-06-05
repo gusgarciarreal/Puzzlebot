@@ -26,7 +26,7 @@ class LineFollower(Node):
         self.declare_parameter('dt', 0.1) # PID update rate, should match image topic rate
         self.declare_parameter('image_height', 240)
         self.declare_parameter('image_width', 320)
-        self.declare_parameter('canny_sigma', 0.33) # Common value for adaptive Canny
+        self.declare_parameter('canny_sigma', 0.05) # Common value is 0.33, but 0.05 works very well
         self.declare_parameter('line_timeout_seconds', 1.0)
         self.declare_parameter('linear_speed', 0.09)
         self.declare_parameter('angular_speed_limit', 0.8)
@@ -39,7 +39,7 @@ class LineFollower(Node):
         self.declare_parameter('roi_bottom_width_offset', 50)
         self.declare_parameter('clahe_clip_limit', 2.0)
         self.declare_parameter('clahe_tile_grid_size', [8, 8])
-        self.declare_parameter('gaussian_blur_kernel_size', [17, 17])
+        self.declare_parameter('gaussian_blur_kernel_size', [11, 11])
         self.declare_parameter('gaussian_blur_sigma_x', 2.0)
 
 
@@ -210,10 +210,10 @@ class LineFollower(Node):
                 candidate_mid_x_coords.append((x1 + x2) / 2.0)
                 valid_lines_for_drawing.append(((x1, y1), (x2, y2)))
 
-                # Optimize Line Detection: Limit to up to 2 candidates
+                # Optimize Line Detection: Limit to up to 3 candidates
                 # This ensures we don't process too many lines if not needed,
                 # focusing on the most prominent ones.
-                if len(candidate_mid_x_coords) >= 2:
+                if len(candidate_mid_x_coords) >= 3:
                     break
 
             if candidate_mid_x_coords:
@@ -330,7 +330,7 @@ class LineFollower(Node):
             cv2.circle(
                 dbg_image,
                 (int(avg_line_center_x), ref_y_for_center_dot),
-                5, # Magic Number for circle radius
+                5, # Circle radius
                 (0, 255, 0),
                 -1,
             )
