@@ -12,12 +12,12 @@ setup(
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
     ],
-    install_requires=['setuptools'],
+    install_requires=['setuptools', 'opencv-python', 'ultralytics',],
     zip_safe=True,
     maintainer='snorlix',
     maintainer_email='kadavetar10@icloud.com',
-    description='TODO: Package description',
-    license='TODO: License declaration',
+    description='Detector de señales de tránsito con YOLOv8',
+    license='Apache License 2.0',
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [

@@ -16,18 +16,18 @@ bridge = CvBridge()
 class Camera_subscriber(Node):
 
     def __init__(self):
-        super().__init__('camera_subscriber')
+        super().__init__("camera_subscriber")
 
         # Assuming bestvol2.pt is correctly installed and located as per your previous fix.
-        self.model = YOLO('/home/ggm/Documents/sexto/Puzzlebot/reto/src/signals_detection/signals_detection/bestvol2.pt')
+        self.model = YOLO(
+            "/home/ggm/Documents/sexto/Puzzlebot/reto/src/signals_detection/signals_detection/bestvol2.pt"
+        )
 
         self.yolov8_inference = Yolov8Inference()
 
         self.subscription = self.create_subscription(
-            Image,
-            '/pre_processed_cam',
-            self.camera_callback,
-            10)
+            Image, "/pre_processed_cam", self.camera_callback, 10
+        )
         self.subscription
 
         self.yolov8_pub = self.create_publisher(Yolov8Inference, "/Yolov8_Inference", 1)
@@ -36,7 +36,12 @@ class Camera_subscriber(Node):
     def camera_callback(self, data):
         img = bridge.imgmsg_to_cv2(data, "bgr8")
 
-        results = self.model(source = img, show=False, conf=0.5, save=False, imgsz=320)
+        results = self.model(
+            source=img, show=False, conf=0.5, save=False, imgsz=320, iou=0.2
+        )
+        # iou is the IoU threshold for non-max suppression
+        # it is used to filter out overlapping bounding boxes based on their Intersection over Union (IoU) score.
+        # so if two boxes overlap significantly, the one with the lower confidence score will be removed.
         # annotator = SolutionAnnotator(img) # This line is not used if results[0].plot() handles annotation
 
         boxes = results[0].boxes.xyxy.cpu()
@@ -57,11 +62,11 @@ class Camera_subscriber(Node):
 
             # Corrected: Use 'cls' for class_name index and correct bounding box assignments
             self.inference_result.class_name = self.model.names[int(cls)]
-            self.inference_result.top = int(y1)    # y1 is top
-            self.inference_result.left = int(x1)   # x1 is left
-            self.inference_result.bottom = int(y2) # y2 is bottom
+            self.inference_result.top = int(y1)  # y1 is top
+            self.inference_result.left = int(x1)  # x1 is left
+            self.inference_result.bottom = int(y2)  # y2 is bottom
             self.inference_result.right = int(x2)  # x2 is right
-            
+
             # Area calculation
             height = int(y2) - int(y1)
             width = int(x2) - int(x1)
@@ -80,7 +85,7 @@ class Camera_subscriber(Node):
 
             color = colors(cls, True)
             cv2.rectangle(img, (x1, y1), (x2, y2), color, 2)
-            
+
             # cv2.putText(img, label, (text_x, text_y), cv2.FONT_HERSHEY_SIMPLEX,0.6, color, 2, cv2.LINE_AA)
 
         # Corrected: Call get_logger() on the instance 'self'
@@ -95,12 +100,14 @@ class Camera_subscriber(Node):
         self.img_pub.publish(img_msg)
         self.yolov8_pub.publish(self.yolov8_inference)
 
+
 def main(args=None):
     rclpy.init(args=args)
     node = Camera_subscriber()
     rclpy.spin(node)
     node.destroy_node()
     rclpy.shutdown()
+
 
 if __name__ == "__main__":
     main()
