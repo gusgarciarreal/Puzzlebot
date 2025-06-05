@@ -1,7 +1,9 @@
 import rclpy
 from rclpy.node import Node
+from rclpy.duration import Duration
 from sensor_msgs.msg import Image
 from geometry_msgs.msg import Twist
+from std_msgs.msg import Bool
 from cv_bridge import CvBridge
 import cv2
 import numpy as np
@@ -9,48 +11,65 @@ import numpy as np
 
 class LineFollower(Node):
     """
-    Nodo ROS2 para seguir una línea utilizando visión por computadora y un controlador PID.
-    Procesa imágenes de la cámara para detectar la línea y publica comandos de velocidad
-    para que el robot la siga.
+    ROS2 node for line following using computer vision and a PID controller.
+    Processes camera images to detect the line and publishes velocity commands
+    for the robot to follow it. Also publishes a boolean status indicating
+    whether the line is currently detected.
     """
 
     def __init__(self):
         super().__init__("line_follower")
 
-        # Configuración de suscriptores y publicadores ROS2
+        # ROS2 publishers and subscribers configuration
         qos = rclpy.qos.qos_profile_sensor_data
         self.sub_img = self.create_subscription(
             Image, "/pre_processed_cam", self.img_callback, qos
         )
         self.pub_cmd = self.create_publisher(Twist, "/line_follower/raw_cmd_vel", 10)
         self.pub_debug = self.create_publisher(Image, "/line_follower/debug", 10)
-        # Se elimina el publicador para la máscara procesada
 
-        self.bridge = CvBridge()
-        self.prev_err = (
-            0.0  # Error previo para el cálculo del término derivativo del PID
+        # Publisher for line detection status
+        self.pub_line_status = self.create_publisher(
+            Bool, "/line_follower/line_detected_status", 10
         )
 
-        # Ganancias del controlador PID
-        self.kp, self.kd = 0.008, 0.001
-        self.dt = 0.1  # Intervalo de tiempo para el bucle de control (10 Hz)
+        self.bridge = CvBridge()
+        self.prev_err = 0.0
 
-        # Dimensiones de imagen esperadas (alto, ancho)
+        # PID controller gains
+        self.kp, self.kd = 0.008, 0.001
+        self.dt = 0.1
+
+        # Expected image dimensions (height, width)
         self.h, self.w = 240, 320
 
-        # Máscara de Región de Interés (ROI)
+        # Region of Interest (ROI) mask
         self.tri_mask = self.build_triangle_mask(self.w, self.h)
 
-        # Objeto para el ajuste de contraste adaptativo (CLAHE)
+        # Adaptive contrast enhancement object (CLAHE)
         self.clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+
+        # Variables for line status publisher
+        self.line_timeout_duration = Duration(seconds=1.0)
+        self.last_line_seen_time = self.get_clock().now()
+        self.line_currently_detected_flag = False
+
+        # Publish initial status (False)
+        self._publish_line_status()
+
+    def _publish_line_status(self):
+        """Publishes the current line detection status."""
+        status_msg = Bool()
+        status_msg.data = self.line_currently_detected_flag
+        self.pub_line_status.publish(status_msg)
 
     def build_triangle_mask(self, w: int, h: int) -> np.ndarray:
         """
-        Construye una máscara triangular para definir la Región de Interés (ROI)
-        en la parte inferior de la imagen.
+        Builds a triangular mask to define the Region of Interest (ROI)
+        in the lower part of the image.
         """
         mask = np.zeros((h, w), dtype=np.uint8)
-        # Define los vértices del triángulo para la ROI
+        # Defines the triangle vertices for the ROI
         pts = np.array(
             [[(50, h - 1), (w - 50, h - 1), (w // 2, h // 2)]], dtype=np.int32
         )
@@ -60,8 +79,8 @@ class LineFollower(Node):
 
     def get_adaptive_canny_thresholds(self, image: np.ndarray, sigma: float = 0.05):
         """
-        Calcula umbrales adaptativos para la detección de bordes Canny
-        basados en la mediana de la intensidad de la imagen.
+        Calculates adaptive thresholds for Canny edge detection
+        based on the image intensity median.
         """
         median = np.median(image)
         lower = int(max(0, (1.0 - sigma) * median))
@@ -70,41 +89,39 @@ class LineFollower(Node):
 
     def _preprocess_image(self, frame: np.ndarray) -> np.ndarray:
         """
-        Realiza el preprocesamiento de la imagen para la detección de bordes.
-        Incluye conversión a escala de grises, mejora de contraste, suavizado
-        y detección de bordes Canny. La máscara ROI se aplica a la salida de Canny.
+        Performs image preprocessing for edge detection.
+        Includes grayscale conversion, contrast enhancement, blurring,
+        and Canny edge detection. The ROI mask is applied to the Canny output.
         """
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
-        # Aplica CLAHE para mejorar el contraste local de la imagen.
+        # Applies CLAHE for local image contrast enhancement.
         clahe_output = self.clahe.apply(gray)
 
-        # Suaviza la imagen antes de la detección de bordes Canny para reducir el ruido.
+        # Blurs the image before Canny edge detection to reduce noise.
         blurred_image = cv2.GaussianBlur(clahe_output, (17, 17), 2)
 
-        # Detecta bordes utilizando el algoritmo de Canny con umbrales adaptativos.
+        # Detects edges using the Canny algorithm with adaptive thresholds.
         lower_canny, upper_canny = self.get_adaptive_canny_thresholds(blurred_image)
         edges = cv2.Canny(blurred_image, lower_canny, upper_canny)
 
-        # Aplica la máscara de la Región de Interés (ROI) directamente a los bordes detectados.
+        # Applies the Region of Interest (ROI) mask directly to the detected edges.
         edges_roi = cv2.bitwise_and(edges, self.tri_mask)
-
-        # Se elimina la publicación de la imagen de bordes/máscara procesada.
 
         return edges_roi
 
     def _detect_line(self, edges: np.ndarray) -> tuple[float | None, list]:
         """
-        Detecta líneas en la imagen de bordes utilizando la Transformada de Hough
-        y calcula el centro promedio de las líneas detectadas que cumplen los criterios.
+        Detects lines in the edge image using the Hough Transform
+        and calculates the average center of detected lines that meet the criteria.
         """
         lines = cv2.HoughLinesP(
             edges,
-            rho=1,  # Resolución de distancia en píxeles
-            theta=np.pi / 180,  # Resolución angular en radianes
-            threshold=30,  # Mínimo número de votos en el espacio de Hough
-            minLineLength=15,  # Longitud mínima de la línea detectada
-            maxLineGap=13,  # Máximo espacio entre segmentos para unirlos
+            rho=1,
+            theta=np.pi / 180,
+            threshold=30,
+            minLineLength=15,
+            maxLineGap=13,
         )
 
         avg_line_center_x = None
@@ -115,11 +132,11 @@ class LineFollower(Node):
             for line_arr in lines:
                 x1, y1, x2, y2 = line_arr[0]
 
-                # Calcula el ángulo de la línea para filtrado.
+                # Calculates the line angle for filtering.
                 angle_rad = np.arctan2(y2 - y1, x2 - x1)
                 angle_deg = np.degrees(angle_rad)
 
-                # Filtra líneas que son demasiado horizontales.
+                # Filters lines that are too horizontal.
                 if abs(angle_deg) < 25 or abs(angle_deg) > 155:
                     continue
 
@@ -133,31 +150,29 @@ class LineFollower(Node):
 
     def _calculate_control(self, avg_line_center_x: float) -> Twist:
         """
-        Calcula las velocidades lineal y angular del robot
-        basándose en el error de posición de la línea y un controlador PID.
+        Calculates the robot's linear and angular velocities
+        based on the line position error and a PID controller.
         """
         cmd = Twist()
-        # Calcula el error: diferencia entre el centro de la línea y el centro de la imagen.
+        # Calculates the error: difference between line center and image center.
         err = avg_line_center_x - self.w / 2.0
-        # Calcula el término derivativo del error.
+        # Calculates the derivative term of the error.
         derr = (err - self.prev_err) / self.dt
-        # Calcula la velocidad angular usando el controlador PD.
+        # Calculates angular velocity using the PD controller.
         omega = -(self.kp * err + self.kd * derr)
-        omega = np.clip(omega, -0.8, 0.8)  # Limita la velocidad angular máxima
+        omega = np.clip(omega, -0.8, 0.8)
 
-        # Ajusta la velocidad lineal dinámicamente: más lento en curvas pronunciadas.
+        # Dynamically adjusts linear speed: slower on sharp turns.
         linear_speed_factor = max(0.2, 1.0 - 0.01 * abs(err))
-        cmd.linear.x = (
-            0.09 * linear_speed_factor
-        )  # Producto vel lineal y factor de curvas
+        cmd.linear.x = 0.09 * linear_speed_factor
 
         cmd.angular.z = omega
-        self.prev_err = err  # Almacena el error actual para la siguiente iteración
+        self.prev_err = err
         return cmd
 
     def _publish_debug_image(self, dbg_image: np.ndarray, original_msg_header):
         """
-        Convierte y publica la imagen de depuración en un tópico ROS2.
+        Converts and publishes the debug image to a ROS2 topic.
         """
         try:
             debug_msg = self.bridge.cv2_to_imgmsg(dbg_image, encoding="bgr8")
@@ -168,39 +183,48 @@ class LineFollower(Node):
 
     def img_callback(self, msg: Image):
         """
-        Función de callback principal que se ejecuta cada vez que llega una nueva imagen.
-        Orquesta el preprocesamiento, la detección de línea, el cálculo de control
-        y la publicación de comandos y datos de depuración.
+        Main callback function executed upon receiving a new image.
+        Orchestrates image preprocessing, line detection, control calculation,
+        and publication of commands and debug data.
+        Also manages the line detection status publication.
         """
+        current_time = self.get_clock().now()
+
         try:
-            # Convierte el mensaje de imagen ROS a un formato OpenCV.
+            # Converts the ROS image message to OpenCV format.
             frame = self.bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
-            # Redimensiona la imagen si no coincide con las dimensiones esperadas.
+            # Resizes the image if it doesn't match expected dimensions.
             if frame.shape[0] != self.h or frame.shape[1] != self.w:
                 frame = cv2.resize(
                     frame, (self.w, self.h), interpolation=cv2.INTER_AREA
                 )
         except Exception as e:
             self.get_logger().error(f"Error converting image: {e}")
+            # Even if there's an image error, check for timeout
+            if self.line_currently_detected_flag:
+                time_since_last_seen = current_time - self.last_line_seen_time
+                if time_since_last_seen >= self.line_timeout_duration:
+                    self.line_currently_detected_flag = False
+            self._publish_line_status()
             return
 
-        dbg_image = frame.copy()  # Crea una copia para dibujar elementos de depuración
+        dbg_image = frame.copy()
 
-        # Llama a la función para preprocesar la imagen, obteniendo los bordes directamente.
+        # Calls the function to preprocess the image, getting the edges directly.
         edges = self._preprocess_image(frame)
 
-        # Llama a la función para detectar la línea en la imagen de bordes.
+        # Calls the function to detect the line in the edge image.
         avg_line_center_x, valid_lines_for_drawing = self._detect_line(edges)
 
         cmd = Twist()
-        line_detected_successfully = False
+        line_detected_in_current_frame = False
 
         if avg_line_center_x is not None:
-            # Si se detectó una línea, calcula los comandos de velocidad.
+            # If a line is detected, calculate velocity commands.
             cmd = self._calculate_control(avg_line_center_x)
-            line_detected_successfully = True
+            line_detected_in_current_frame = True
 
-            # Dibuja las líneas detectadas y el punto de referencia en la imagen de depuración.
+            # Draws detected lines and reference point on the debug image.
             for p1, p2 in valid_lines_for_drawing:
                 cv2.line(dbg_image, p1, p2, (0, 255, 0), 2)
 
@@ -223,7 +247,7 @@ class LineFollower(Node):
                 2,
             )
         else:
-            # Si no se detecta la línea, detiene el robot y reinicia el error.
+            # If no line is detected, stop the robot and reset the error.
             cmd.linear.x = 0.0
             cmd.angular.z = 0.0
             self.prev_err = 0.0
@@ -238,10 +262,29 @@ class LineFollower(Node):
                 cv2.LINE_AA,
             )
 
-        # Publica los comandos de velocidad para el robot.
+        # Line detection status logic
+        previous_flag_state = self.line_currently_detected_flag
+
+        if line_detected_in_current_frame:
+            self.last_line_seen_time = current_time
+            self.line_currently_detected_flag = True
+        else:
+            if self.line_currently_detected_flag:
+                time_since_last_seen = current_time - self.last_line_seen_time
+                if time_since_last_seen >= self.line_timeout_duration:
+                    self.line_currently_detected_flag = False
+                    self.get_logger().info("Line lost due to timeout.")
+
+        # Publish if the status changed or if it's currently detected.
+        if previous_flag_state != self.line_currently_detected_flag:
+            self._publish_line_status()
+        # elif self.line_currently_detected_flag:
+        #     self._publish_line_status()
+
+        # Publishes velocity commands for the robot.
         self.pub_cmd.publish(cmd)
 
-        # Dibuja el contorno de la ROI.
+        # Draws the ROI contour.
         pts_roi_visualization = np.array(
             [[(50, self.h - 1), (self.w - 50, self.h - 1), (self.w // 2, self.h // 2)]],
             dtype=np.int32,
@@ -253,16 +296,14 @@ class LineFollower(Node):
             color=(0, 255, 255),
             thickness=1,
         )
-        # Superpone los bordes de Canny en la imagen de depuración.
-        # dbg_image[edges == 255] = [255, 0, 0]  # Resalta los bordes Canny en azul
 
-        # Publica la imagen de depuración final.
+        # Publishes the final debug image.
         self._publish_debug_image(dbg_image, msg.header)
 
 
 def main(args=None):
     """
-    Función principal que inicializa el nodo ROS2 y lo mantiene activo.
+    Main function that initializes the ROS2 node and keeps it active.
     """
     rclpy.init(args=args)
     node = LineFollower()
@@ -271,10 +312,17 @@ def main(args=None):
     except KeyboardInterrupt:
         pass
     finally:
-        # Al salir, asegura que el robot se detenga.
+        # On exit, ensure the robot stops.
         stop_cmd = Twist()
         node.pub_cmd.publish(stop_cmd)
-        node.get_logger().info("Shutting down and stopping robot.")
+
+        # Ensure False is published on shutdown if the line is not detected.
+        node.line_currently_detected_flag = False
+        node._publish_line_status()
+        node.get_logger().info(
+            "Shutting down, stopping robot, and setting line status to False."
+        )
+
         node.destroy_node()
         rclpy.shutdown()
 
