@@ -31,19 +31,12 @@ class SpeedModerator(Node):
         self.current_sign_flag = None
         # Stores the bounding box area of the current detected sign, used for filtering.
         self.current_sign_area = 0
-        # Minimum area threshold for a detected sign to be considered valid.
-        self.area_threshold = 5000
-
         # Boolean flag to indicate if the robot is currently executing a predefined sign action (e.g., a turn).
         self.executing_sign_action = False
         # Timestamp when a sign action started, used to control action duration.
         self.sign_action_start_time = None
-
-        # NUEVA BANDERA: Para moverse recto después de señal "0_straight" hasta redetectar línea
-        self.reacquiring_line_after_straight_sign = False
-        self.straight_speed_on_reacquire = (
-            0.15  # Velocidad lineal para avanzar recto (ajustable)
-        )
+        # Minimum area threshold for a detected sign to be considered valid.
+        self.area_threshold = 5000
 
         # --- Subscriptions ---
         # Subscribes to raw velocity commands from the line follower.
@@ -99,172 +92,104 @@ class SpeedModerator(Node):
         """
         self.line_detected = bool(msg.data)
 
-    def yolo_inference_callback(
-        self, msg: InferenceResult
-    ):  # Asumiendo que es InferenceResult por detección
+    def yolo_inference_callback(self, msg):
+        """
+        Callback for receiving YOLOv8 inference results.
+        Processes detected traffic signs to determine robot behavior.
+        """
+        # Ignore signs if their detected area is too small (likely a distant or false positive).
         if msg.area < self.area_threshold:
-            # self.get_logger().info(f"Sign {msg.class_name} detected but area {msg.area} is below threshold {self.area_threshold}")
-            # Si la señal es muy pequeña y era la que estaba activa, podríamos querer limpiarla si no hay otras más grandes.
-            # Opcional: if msg.class_name == self.current_sign_flag: self.current_sign_flag = None
             return
 
-        if self.executing_sign_action or self.reacquiring_line_after_straight_sign:
-            # Si ya está en una acción de señal (giro o re-adquisición de línea),
-            # ignorar nuevas detecciones de señales para no interrumpir la maniobra actual.
-            # Podrías querer una lógica más sofisticada si una señal de STOP debe interrumpir todo.
+        # If already executing a sign action, ignore new sign detections to complete current action.
+        if self.executing_sign_action:
             return
 
+        # Define valid traffic signs that this node will respond to.
         valid_signs = ["0_straight", "3_turn_left", "4_turn_right", "1_stop"]
+
+        # If a valid sign is detected, update the current sign flag and its area.
         if msg.class_name in valid_signs:
-            # Solo actualiza si la nueva señal es diferente o si no había ninguna activa,
-            # o si la nueva señal es más grande (esto es opcional y puede complicar).
-            # Por simplicidad, la última señal válida detectada toma precedencia si no estamos en una acción.
-            if self.current_sign_flag != msg.class_name:
-                self.get_logger().info(
-                    f"New sign detected: {msg.class_name} with area {msg.area}"
-                )
             self.current_sign_flag = msg.class_name
             self.current_sign_area = msg.area
-        # else:
-        # Si se detecta una señal no válida y había una válida activa, podríamos querer limpiarla.
-        # if self.current_sign_flag:
-        #     self.get_logger().info(f"Previously active sign {self.current_sign_flag} no longer primary detection or invalid sign detected.")
-        #     self.current_sign_flag = None
+            self.get_logger().info(
+                f"Sign detected: {msg.class_name} with area {msg.area}"
+            )
 
     def process_and_publish_cmd(self):
-        cmd = Twist()
+        """
+        Main processing function that determines and publishes the robot's
+        velocity commands based on a priority hierarchy:
+        1. Executing a predefined sign action (highest priority).
+        2. Responding to detected traffic signs.
+        3. Responding to traffic light status (lowest priority).
+        """
+        cmd = Twist()  # Initialize an empty Twist message for commands
 
-        # --- NUEVA PRIORIDAD MÁXIMA: Re-adquiriendo línea después de señal "0_straight" ---
-        if self.reacquiring_line_after_straight_sign:
-            if self.line_detected:
-                self.get_logger().info(
-                    "Line re-detected after 'straight' sign. Resuming normal control."
-                )
-                self.reacquiring_line_after_straight_sign = False
-                if (
-                    self.current_sign_flag == "0_straight"
-                ):  # Limpiar la señal que activó este estado
-                    self.current_sign_flag = None
-                cmd = self.last_raw_cmd_vel  # Volver a los comandos del line_follower
-                # No hacer return aquí, permitir que la lógica de semáforos (si aplica) evalúe este cmd.
-            else:
-                # Aún intentando re-adquirir la línea, moverse recto.
-                self.get_logger().info("State: Re-acquiring line (moving straight).")
-                cmd.linear.x = self.straight_speed_on_reacquire
-                cmd.angular.z = 0.0
-                self.cmd_pub.publish(cmd)
-                return  # Acción explícita, anular otra lógica para este ciclo.
-
-        # --- Prioridad 1: Ejecutar acción de señal temporizada (Giros) ---
+        # --- Priority 1: Execute Predefined Sign Action ---
+        # If the robot is in the middle of a sign-triggered maneuver (e.g., a turn).
         if self.executing_sign_action:
             elapsed = time.time() - self.sign_action_start_time
-            action_complete = False
+
             if self.current_sign_flag == "4_turn_right":
-                if elapsed < 2.0:  # Avanzar un poco
-                    cmd.linear.x = 0.15
-                else:  # Girar
-                    cmd.angular.z = -0.5
-                    cmd.linear.x = 0.0
+                # First, move straight for a bit to clear the intersection/position for the turn.
+                if elapsed < 2.0:
+                    cmd.linear.x = 0.15  # Move forward
+                else:
+                    # Then, execute the turn.
+                    cmd.angular.z = -0.5  # Turn right (negative Z angular velocity)
+                    cmd.linear.x = 0.0  # Stop linear movement during turn
+                    # After a total duration, reset the action state.
                     if elapsed > 3.5:
-                        action_complete = True
+                        self.executing_sign_action = False
+                        self.current_sign_flag = None  # Clear the sign flag
+
             elif self.current_sign_flag == "3_turn_left":
-                if elapsed < 2.0:  # Avanzar un poco
+                # Similar logic for turning left.
+                if elapsed < 2.0:
                     cmd.linear.x = 0.15
-                else:  # Girar
-                    cmd.angular.z = 0.5
+                else:
+                    cmd.angular.z = 0.5  # Turn left (positive Z angular velocity)
                     cmd.linear.x = 0.0
                     if elapsed > 3.5:
-                        action_complete = True
+                        self.executing_sign_action = False
+                        self.current_sign_flag = None
 
-            if action_complete:
-                self.get_logger().info(
-                    f"Finished sign action for {self.current_sign_flag}."
-                )
-                self.executing_sign_action = False
-                self.current_sign_flag = None
-                # cmd se quedará con la última velocidad de la acción (probablemente (0,0) o giro)
-                # Es importante publicar un Twist() vacío si queremos que se detenga completamente.
-                cmd = Twist()  # Detenerse después de la acción de giro.
+            self.cmd_pub.publish(cmd)  # Publish the command for the ongoing action.
+            return  # Exit early as a higher priority action is being executed.
 
-            self.cmd_pub.publish(cmd)
-            return
-
-        # --- Prioridad 2: Responder a señales de tráfico recién detectadas (no temporizadas o inicio de temporizadas) ---
-        # Esta sección se alcanza si no estamos en reacquiring_line_after_straight_sign ni en executing_sign_action.
+        # --- Priority 2: Respond to Detected Traffic Signs ---
+        # If no sign action is currently in progress, check for new sign detections.
         if self.current_sign_flag == "1_stop":
+            # 'Stop' sign: full stop.
             cmd.linear.x = 0.0
             cmd.angular.z = 0.0
-            # self.current_sign_flag no se limpia automáticamente para "1_stop".
-            # El robot se detendrá mientras "1_stop" sea el flag activo.
-            # Considerar una lógica para "reanudar" después de un "stop".
-
         elif self.current_sign_flag == "0_straight":
-            # Si llegamos aquí, es una nueva detección de "0_straight" y no estamos re-adquiriendo línea.
-            if not self.line_detected:
-                self.get_logger().info(
-                    "'0_straight' sign detected at intersection (no line). Initiating line re-acquisition."
-                )
-                self.reacquiring_line_after_straight_sign = True
-                # La acción de moverse recto comenzará en el siguiente ciclo del timer
-                # debido al bloque de MÁXIMA PRIORIDAD.
-                # Para este ciclo, podemos detenernos o avanzar un poco.
-                cmd.linear.x = (
-                    self.straight_speed_on_reacquire
-                )  # Empezar a moverse recto inmediatamente
-                cmd.angular.z = 0.0
-                # No limpiar current_sign_flag aquí; el estado de re-adquisición lo usará.
-            else:
-                # Señal "0_straight" detectada Y la línea está presente.
-                self.get_logger().info(
-                    "'0_straight' sign detected while on line. Continuing line following."
-                )
-                cmd = self.last_raw_cmd_vel
-                self.current_sign_flag = (
-                    None  # La instrucción de la señal se está cumpliendo.
-                )
-
-        elif self.current_sign_flag in ["3_turn_left", "4_turn_right"]:
-            # Iniciar una acción de giro si no hay línea detectada.
-            if not self.line_detected:
-                self.get_logger().info(
-                    f"'{self.current_sign_flag}' sign detected at intersection (no line). Initiating turn sequence."
-                )
-                self.executing_sign_action = True
-                self.sign_action_start_time = time.time()
-                # El giro comenzará en el próximo ciclo. Detenerse o avanzar un poco ahora:
-                cmd.linear.x = 0.0  # Detenerse brevemente antes de la maniobra de giro.
-                cmd.angular.z = 0.0
-            else:
-                # Señal de giro detectada, pero la línea aún está presente. Seguir línea.
-                self.get_logger().info(
-                    f"'{self.current_sign_flag}' sign detected, but line still present. Deferring turn."
-                )
-                cmd = self.last_raw_cmd_vel
-                # No limpiar current_sign_flag, esperar a que la línea se pierda para iniciar el giro.
-
-        # --- Prioridad 3: Responder al estado del semáforo ---
-        # Se ejecuta si ninguna acción de señal está activa o configuró `cmd` y retornó.
-        elif self.traffic_light_flag == 1:  # Verde
-            # self.get_logger().info("Traffic light Green: Following line follower commands.")
+            # If a line is detected, let the line follower continue.
+            # If no line is detected (e.g., intersection), use the last raw velocity to move forward.
             cmd = self.last_raw_cmd_vel
-        elif self.traffic_light_flag == 2:  # Amarillo
-            self.get_logger().info("Traffic light Yellow: Reducing speed.")
+        elif self.current_sign_flag in ["3_turn_left", "4_turn_right"]:
+            # 'Turn' signs: initiate a predefined turning action.
+            # Only trigger the turn action if no line is detected (implies being at an intersection).
+            if not self.line_detected:
+                self.executing_sign_action = (
+                    True  # Set flag to start executing the action.
+                )
+                self.sign_action_start_time = time.time()  # Record start time.
+                return  # Exit this cycle; the turn action will begin in the next timer iteration (Priority 1).
+
+        # --- Priority 3: Respond to Traffic Light Status ---
+        # If no sign is active or being executed, apply traffic light logic.
+        elif self.traffic_light_flag == 1:  # Green light: proceed with raw commands.
+            cmd = self.last_raw_cmd_vel
+        elif self.traffic_light_flag == 2:  # Yellow light: reduce speed by half.
             cmd.linear.x = self.last_raw_cmd_vel.linear.x / 2.0
             cmd.angular.z = self.last_raw_cmd_vel.angular.z / 2.0
-        elif self.traffic_light_flag == 3:  # Rojo
-            self.get_logger().info("Traffic light Red: Stopping.")
+        elif self.traffic_light_flag == 3:  # Red light: stop the robot.
             cmd.linear.x = 0.0
             cmd.angular.z = 0.0
-        else:
-            # Caso por defecto: si no hay semáforo o ninguna condición anterior se cumplió
-            # y cmd no fue modificado por una señal.
-            if (
-                self.current_sign_flag is None
-                and not self.executing_sign_action
-                and not self.reacquiring_line_after_straight_sign
-            ):
-                cmd = self.last_raw_cmd_vel
 
+        # Publish the final determined command.
         self.cmd_pub.publish(cmd)
 
 
