@@ -22,7 +22,7 @@ class SignalDetectorNode(Node):
             "model_path",
             "/home/ggm/Documents/sexto/Puzzlebot/reto/src/signals_detection/signals_detection/my_model2.pt",
         )
-        self.declare_parameter("confidence_threshold", 0.5)
+        self.declare_parameter("confidence_threshold", 0.8)
         self.declare_parameter("iou_threshold", 0.1)
         self.declare_parameter("image_size", 320)
         self.declare_parameter("log_on_state_change", True)
