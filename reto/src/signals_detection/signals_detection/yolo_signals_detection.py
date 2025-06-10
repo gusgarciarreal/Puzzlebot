@@ -1,7 +1,6 @@
 import cv2
-from ultralytics import YOLO
 
-# from ultralytics.solutions.solutions import SolutionAnnotator # Keep if you plan to use it
+from ultralytics import YOLO
 from ultralytics.utils.plotting import colors
 
 import rclpy
@@ -21,7 +20,7 @@ class SignalDetectorNode(Node):
         # Declare parameters
         self.declare_parameter(
             "model_path",
-            "/home/ggm/Documents/sexto/Puzzlebot/reto/src/signals_detection/signals_detection/bestvol2.pt",
+            "/home/ggm/Documents/sexto/Puzzlebot/reto/src/signals_detection/signals_detection/my_model2.pt",
         )
         self.declare_parameter("confidence_threshold", 0.5)
         self.declare_parameter("iou_threshold", 0.1)
