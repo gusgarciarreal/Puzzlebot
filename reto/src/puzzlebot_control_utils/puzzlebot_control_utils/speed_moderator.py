@@ -1,214 +1,261 @@
+#!/usr/bin/env python3
+"""
+Nodo Moderador de Velocidad para un Robot Móvil.
+
+Este nodo actúa como un árbitro, tomando decisiones de alto nivel sobre la 
+velocidad del robot. Se suscribe a la velocidad "cruda" del seguidor de línea,
+al estado de detección de la línea, a las señales de tráfico detectadas (YOLO)
+y al estado de los semáforos.
+
+Basado en un conjunto de reglas de prioridad, publica el comando de velocidad
+final en el tópico `/cmd_vel`.
+
+Lógica de Prioridades:
+1.  **Parada Total (Máxima Prioridad):** Si se detecta una señal de 'stop' o un semáforo en rojo.
+2.  **Maniobras Especiales:** Si se pierde la línea, ejecuta acciones basadas en la última señal vista (giro, seguir recto, espera en 'giveway').
+3.  **Reducción de Velocidad:** Si se detectan señales como 'work', 'giveway' o un semáforo en amarillo.
+4.  **Operación Normal:** Si no se cumple ninguna condición anterior, simplemente pasa la velocidad del seguidor de línea.
+"""
+
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Twist
-from std_msgs.msg import Int32
-from yolov8_msgs.msg import InferenceResult
+from std_msgs.msg import Bool, Int32
+from yolov8_msgs.msg import Yolov8Inference
 import time
+from enum import Enum, auto
+
+# --- Constantes para una mejor configuración ---
+FINAL_VEL_TOPIC = '/cmd_vel'
+RAW_VEL_TOPIC = '/line_follower/raw_cmd_vel'
+LINE_STATUS_TOPIC = '/line_follower/line_detected_status'
+SIGNALS_TOPIC = '/Yolov8_Inference'
+TRAFFIC_LIGHT_TOPIC = '/traffic_light_status'
 
 
-class SpeedModerator(Node):
+class NodeState(Enum):
+    """Define los posibles estados operativos del robot para un logging claro."""
+    FOLLOWING_LINE = auto()
+    STOPPED_RED_LIGHT = auto()
+    STOPPED_SIGN = auto()
+    PERFORMING_TURN = auto()
+    HANDLING_LOST_LINE_STRAIGHT = auto()
+    WAITING_AT_GIVEAWAY = auto()
+    REDUCED_SPEED = auto()
+    PASS_THROUGH = auto() # Estado por defecto o sin acción específica
+    UNKNOWN = auto()
+
+
+class TrafficLightState(Enum):
+    """Mapea el Int32 del nodo de semáforos a un estado legible."""
+    NONE = 0
+    GREEN = 1
+    YELLOW = 2
+    RED = 3
+
+
+class SpeedModeratorNode(Node):
     """
-    The SpeedModerator node is responsible for arbitrating robot velocity commands
-    based on various environmental inputs: line detection, traffic lights, and
-    YOLOv8-detected traffic signs. It prioritizes actions based on a defined hierarchy.
+    Modera la velocidad del robot basándose en la detección de líneas, 
+    señales de tráfico y semáforos.
     """
-
     def __init__(self):
+        super().__init__('speed_moderator')
+
+        # --- Parámetros Configurables del Nodo ---
+        self.declare_parameter('turn_linear_speed', 0.07)
+        self.declare_parameter('turn_angular_speed', 0.5)
+        self.declare_parameter('turn_duration_seconds', 3.0)
+        self.declare_parameter('giveaway_wait_seconds', 2.0)
+        self.declare_parameter('speed_reduction_factor', 0.5) # Reduce la velocidad al 50%
+        self.declare_parameter('update_frequency', 20.0) # Hz para el bucle principal
+
+        # Obtener valores de los parámetros
+        self._turn_linear_speed = self.get_parameter('turn_linear_speed').value
+        self._turn_angular_speed = self.get_parameter('turn_angular_speed').value
+        self._turn_duration = self.get_parameter('turn_duration_seconds').value
+        self._giveaway_wait_duration = self.get_parameter('giveaway_wait_seconds').value
+        self._speed_reduction_factor = self.get_parameter('speed_reduction_factor').value
+        update_period = 1.0 / self.get_parameter('update_frequency').value
+
+        # --- Publicadores ---
+        self._cmd_vel_publisher = self.create_publisher(Twist, FINAL_VEL_TOPIC, 10)
+
+        # --- Suscriptores ---
+        self.create_subscription(Twist, RAW_VEL_TOPIC, self._raw_vel_callback, 10)
+        self.create_subscription(Bool, LINE_STATUS_TOPIC, self._line_status_callback, 10)
+        self.create_subscription(Yolov8Inference, SIGNALS_TOPIC, self._signals_callback, 10)
+        self.create_subscription(Int32, TRAFFIC_LIGHT_TOPIC, self._traffic_light_callback, 10)
+
+        # --- Variables de Estado Interno ---
+        self._current_raw_vel = Twist()
+        self._is_line_detected = False
+        self._active_signals = set()
+        self._last_seen_maneuver_signal = None  # 'left', 'right', 'straight'
+        self._traffic_light_state = TrafficLightState.NONE
+        
+        # Estado para maniobras temporizadas
+        self._maneuver_start_time = None
+
+        # Estado para el logging
+        self._current_node_state = NodeState.PASS_THROUGH
+        self._last_logged_state = None
+
+        # --- Bucle Principal de Control ---
+        self._control_timer = self.create_timer(update_period, self._update_loop)
+
+        self.get_logger().info('Speed Moderator node has started.')
+
+    # --- Callbacks para actualizar el estado ---
+
+    def _raw_vel_callback(self, msg: Twist):
+        self._current_raw_vel = msg
+
+    def _line_status_callback(self, msg: Bool):
+        self._is_line_detected = msg.data
+
+    def _signals_callback(self, msg: Yolov8Inference):
+        self._active_signals = {inf.class_name for inf in msg.yolov8_inference}
+        # Guardar la última señal de maniobra vista para usarla si se pierde la línea
+        maneuver_signals = {'left', 'right', 'straight'}
+        current_maneuver_signals = self._active_signals.intersection(maneuver_signals)
+        if current_maneuver_signals:
+            self._last_seen_maneuver_signal = current_maneuver_signals.pop()
+    
+    def _traffic_light_callback(self, msg: Int32):
+        try:
+            self._traffic_light_state = TrafficLightState(msg.data)
+        except ValueError:
+            self._traffic_light_state = TrafficLightState.NONE
+
+    # --- Bucle Principal de Lógica ---
+
+    def _update_loop(self):
         """
-        Initializes the SpeedModerator node, sets up internal state variables,
-        and creates subscribers and publishers.
+        Bucle principal que se ejecuta a una frecuencia fija.
+        Determina y publica la velocidad final del robot.
         """
-        super().__init__("speed_moderator")
+        final_vel = Twist()
+        new_state = NodeState.PASS_THROUGH # Estado por defecto
 
-        # --- System State Variables ---
-        # Stores the last received raw command from the line follower, used as a base.
-        self.last_raw_cmd_vel = Twist()
-        # Traffic light status: 1=Green, 2=Yellow, 3=Red (default to Red for safety).
-        self.traffic_light_flag = 3
-        # Flag indicating if a line is currently detected by the line follower.
-        self.line_detected = True
-        # Stores the class name of the currently detected traffic sign (e.g., '1_stop').
-        self.current_sign_flag = None
-        # Stores the bounding box area of the current detected sign, used for filtering.
-        self.current_sign_area = 0
-        # Boolean flag to indicate if the robot is currently executing a predefined sign action (e.g., a turn).
-        self.executing_sign_action = False
-        # Timestamp when a sign action started, used to control action duration.
-        self.sign_action_start_time = None
-        # Minimum area threshold for a detected sign to be considered valid.
-        self.area_threshold = 5000
+        # --- LÓGICA DE DECISIÓN POR PRIORIDADES ---
 
-        # --- Subscriptions ---
-        # Subscribes to raw velocity commands from the line follower.
-        self.create_subscription(
-            Twist, "/line_follower/raw_cmd_vel", self.raw_cmd_vel_callback, 10
-        )
+        # 1. MÁXIMA PRIORIDAD: CONDICIONES DE PARADA TOTAL
+        is_stopped_by_sign = 'stop' in self._active_signals
+        is_stopped_by_light = self._traffic_light_state == TrafficLightState.RED
 
-        # Subscribes to the traffic light status.
-        self.create_subscription(
-            Int32, "/traffic_light_status", self.traffic_light_callback, 10
-        )
+        if is_stopped_by_sign or is_stopped_by_light:
+            final_vel.linear.x = 0.0
+            final_vel.angular.z = 0.0
+            new_state = NodeState.STOPPED_SIGN if is_stopped_by_sign else NodeState.STOPPED_RED_LIGHT
+            # Si estamos parados, reseteamos cualquier maniobra pendiente
+            self._maneuver_start_time = None
+        
+        # 2. SEGUNDA PRIORIDAD: MANEJO DE PÉRDIDA DE LÍNEA
+        elif not self._is_line_detected:
+            # Si no hay línea, la velocidad cruda será cero. Decidimos si hacer una maniobra.
+            final_vel = self._handle_lost_line()
+            # El estado se determina dentro de la función de manejo
+            if final_vel.angular.z != 0.0:
+                new_state = NodeState.PERFORMING_TURN
+            elif final_vel.linear.x != 0.0:
+                new_state = NodeState.HANDLING_LOST_LINE_STRAIGHT
+            elif self._maneuver_start_time is not None: # Indica que estamos esperando en giveaway
+                 new_state = NodeState.WAITING_AT_GIVEAWAY
+            else:
+                new_state = NodeState.PASS_THROUGH # Línea perdida, sin señal, se detiene
+        
+        # 3. TERCERA PRIORIDAD: CONDICIONES DE OPERACIÓN NORMAL (LÍNEA DETECTADA)
+        else:
+            # Empezamos con la velocidad del seguidor de línea
+            final_vel = self._current_raw_vel
+            # Reseteamos la última señal de maniobra ya que vemos la línea de nuevo
+            self._last_seen_maneuver_signal = None 
+            self._maneuver_start_time = None
 
-        # Subscribes to the line detection flag.
-        self.create_subscription(
-            Int32, "/line_detected_flag", self.line_flag_callback, 10
-        )
+            # Aplicar reducción de velocidad si es necesario
+            is_work_signal = 'work' in self._active_signals
+            is_giveway_signal = 'giveway' in self._active_signals
+            is_yellow_light = self._traffic_light_state == TrafficLightState.YELLOW
+            
+            if is_work_signal or is_giveway_signal or is_yellow_light:
+                final_vel.linear.x *= self._speed_reduction_factor
+                final_vel.angular.z *= self._speed_reduction_factor
+                new_state = NodeState.REDUCED_SPEED
+            else:
+                # Si vemos luz verde, o no hay semáforo ni señales de reducción, velocidad normal.
+                new_state = NodeState.FOLLOWING_LINE
 
-        # Subscribes to YOLOv8 inference results for traffic sign detection.
-        self.create_subscription(
-            InferenceResult, "/Yolov8_Inference", self.yolo_inference_callback, 10
-        )
+        # Publicar la velocidad final calculada
+        self._cmd_vel_publisher.publish(final_vel)
+        
+        # Registrar el cambio de estado si ha ocurrido
+        self._log_state_change(new_state)
 
-        # --- Publisher ---
-        # Publishes the final moderated velocity commands to the robot.
-        self.cmd_pub = self.create_publisher(Twist, "/cmd_vel", 10)
-
-        # --- Timer ---
-        # Main timer that triggers the command processing and publishing logic.
-        self.timer = self.create_timer(0.1, self.process_and_publish_cmd)
-
-        self.get_logger().info("Speed Moderator node with YOLOv8 integration started.")
-
-    # --- Callback Functions ---
-
-    def raw_cmd_vel_callback(self, msg):
+    def _handle_lost_line(self) -> Twist:
         """
-        Callback for receiving raw velocity commands from the line follower.
-        These commands serve as the default movement instructions.
+        Gestiona el comportamiento del robot cuando no se detecta la línea.
+        Devuelve el comando de velocidad a ejecutar.
         """
-        self.last_raw_cmd_vel = msg
+        cmd = Twist()
 
-    def traffic_light_callback(self, msg):
-        """
-        Callback for receiving the traffic light status.
-        Updates the internal traffic light flag.
-        """
-        self.traffic_light_flag = msg.data
+        # Caso GIVEWAY: esperar 2 segundos detenido
+        if 'giveway' in self._active_signals:
+            if self._maneuver_start_time is None:
+                self._maneuver_start_time = time.time()
+                self.get_logger().info("Giveaway: Line lost, waiting for 2 seconds.")
+            
+            if time.time() - self._maneuver_start_time < self._giveaway_wait_duration:
+                return cmd # Devuelve velocidad cero mientras espera
 
-    def line_flag_callback(self, msg):
-        """
-        Callback for receiving the line detected flag.
-        Updates the internal boolean flag indicating line presence.
-        """
-        self.line_detected = bool(msg.data)
+        # Si la espera ha terminado o no era giveaway, resetea el timer
+        self._maneuver_start_time = None
 
-    def yolo_inference_callback(self, msg):
-        """
-        Callback for receiving YOLOv8 inference results.
-        Processes detected traffic signs to determine robot behavior.
-        """
-        # Ignore signs if their detected area is too small (likely a distant or false positive).
-        if msg.area < self.area_threshold:
-            return
+        # Casos de GIRO o RECTO
+        if self._last_seen_maneuver_signal in ['left', 'right']:
+            if self._maneuver_start_time is None:
+                self._maneuver_start_time = time.time() # Iniciar temporizador de giro
 
-        # If already executing a sign action, ignore new sign detections to complete current action.
-        if self.executing_sign_action:
-            return
-
-        # Define valid traffic signs that this node will respond to.
-        valid_signs = ["0_straight", "3_turn_left", "4_turn_right", "1_stop"]
-
-        # If a valid sign is detected, update the current sign flag and its area.
-        if msg.class_name in valid_signs:
-            self.current_sign_flag = msg.class_name
-            self.current_sign_area = msg.area
-            self.get_logger().info(
-                f"Sign detected: {msg.class_name} with area {msg.area}"
-            )
-
-    def process_and_publish_cmd(self):
-        """
-        Main processing function that determines and publishes the robot's
-        velocity commands based on a priority hierarchy:
-        1. Executing a predefined sign action (highest priority).
-        2. Responding to detected traffic signs.
-        3. Responding to traffic light status (lowest priority).
-        """
-        cmd = Twist()  # Initialize an empty Twist message for commands
-
-        # --- Priority 1: Execute Predefined Sign Action ---
-        # If the robot is in the middle of a sign-triggered maneuver (e.g., a turn).
-        if self.executing_sign_action:
-            elapsed = time.time() - self.sign_action_start_time
-
-            if self.current_sign_flag == "4_turn_right":
-                # First, move straight for a bit to clear the intersection/position for the turn.
-                if elapsed < 2.0:
-                    cmd.linear.x = 0.15  # Move forward
-                else:
-                    # Then, execute the turn.
-                    cmd.angular.z = -0.5  # Turn right (negative Z angular velocity)
-                    cmd.linear.x = 0.0  # Stop linear movement during turn
-                    # After a total duration, reset the action state.
-                    if elapsed > 3.5:
-                        self.executing_sign_action = False
-                        self.current_sign_flag = None  # Clear the sign flag
-
-            elif self.current_sign_flag == "3_turn_left":
-                # Similar logic for turning left.
-                if elapsed < 2.0:
-                    cmd.linear.x = 0.15
-                else:
-                    cmd.angular.z = 0.5  # Turn left (positive Z angular velocity)
-                    cmd.linear.x = 0.0
-                    if elapsed > 3.5:
-                        self.executing_sign_action = False
-                        self.current_sign_flag = None
-
-            self.cmd_pub.publish(cmd)  # Publish the command for the ongoing action.
-            return  # Exit early as a higher priority action is being executed.
-
-        # --- Priority 2: Respond to Detected Traffic Signs ---
-        # If no sign action is currently in progress, check for new sign detections.
-        if self.current_sign_flag == "1_stop":
-            # 'Stop' sign: full stop.
-            cmd.linear.x = 0.0
-            cmd.angular.z = 0.0
-        elif self.current_sign_flag == "0_straight":
-            # If a line is detected, let the line follower continue.
-            # If no line is detected (e.g., intersection), use the last raw velocity to move forward.
-            cmd = self.last_raw_cmd_vel
-        elif self.current_sign_flag in ["3_turn_left", "4_turn_right"]:
-            # 'Turn' signs: initiate a predefined turning action.
-            # Only trigger the turn action if no line is detected (implies being at an intersection).
-            if not self.line_detected:
-                self.executing_sign_action = (
-                    True  # Set flag to start executing the action.
-                )
-                self.sign_action_start_time = time.time()  # Record start time.
-                return  # Exit this cycle; the turn action will begin in the next timer iteration (Priority 1).
-
-        # --- Priority 3: Respond to Traffic Light Status ---
-        # If no sign is active or being executed, apply traffic light logic.
-        elif self.traffic_light_flag == 1:  # Green light: proceed with raw commands.
-            cmd = self.last_raw_cmd_vel
-        elif self.traffic_light_flag == 2:  # Yellow light: reduce speed by half.
-            cmd.linear.x = self.last_raw_cmd_vel.linear.x / 2.0
-            cmd.angular.z = self.last_raw_cmd_vel.angular.z / 2.0
-        elif self.traffic_light_flag == 3:  # Red light: stop the robot.
-            cmd.linear.x = 0.0
+            if time.time() - self._maneuver_start_time < self._turn_duration:
+                cmd.linear.x = self._turn_linear_speed
+                cmd.angular.z = self._turn_angular_speed if self._last_seen_maneuver_signal == 'left' else -self._turn_angular_speed
+            else:
+                # El tiempo de giro terminó, detener la maniobra
+                self._last_seen_maneuver_signal = None
+                self._maneuver_start_time = None
+        
+        elif self._last_seen_maneuver_signal == 'straight':
+            cmd.linear.x = self._turn_linear_speed # Usamos la misma velocidad lineal
             cmd.angular.z = 0.0
 
-        # Publish the final determined command.
-        self.cmd_pub.publish(cmd)
+        # Si no hay ninguna señal de maniobra, la velocidad es cero (devuelve cmd por defecto)
+        return cmd
+
+    def _log_state_change(self, new_state: NodeState):
+        """
+        Registra un mensaje en el logger solo si el estado del nodo ha cambiado.
+        """
+        if new_state != self._last_logged_state:
+            self.get_logger().info(f"State changed to: {new_state.name}")
+            self._last_logged_state = new_state
+
+    def _shutdown_hook(self):
+        """Publica un comando de detención al apagar el nodo."""
+        self.get_logger().info("Shutting down Speed Moderator. Sending stop command.")
+        self._cmd_vel_publisher.publish(Twist())
 
 
 def main(args=None):
-    """
-    Main function to initialize the ROS 2 system and spin the SpeedModerator node.
-    """
     rclpy.init(args=args)
-    node = SpeedModerator()
+    node = SpeedModeratorNode()
     try:
-        rclpy.spin(node)  # Keep the node alive and processing callbacks.
+        rclpy.spin(node)
     except KeyboardInterrupt:
-        # Handle Ctrl+C gracefully to shut down the node.
         pass
     finally:
-        # Clean up resources before exiting.
+        node._shutdown_hook()
         node.destroy_node()
         rclpy.shutdown()
 
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
