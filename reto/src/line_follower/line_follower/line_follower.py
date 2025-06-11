@@ -374,8 +374,8 @@ class LineFollower(Node):
                     self.get_logger().info("Line lost due to timeout.")
 
         # Publish if the status changed.
-        if previous_flag_state != self.line_currently_detected_flag:
-            self._publish_line_status()
+        #if previous_flag_state != self.line_currently_detected_flag:
+        self._publish_line_status()
 
         # Publishes velocity commands for the robot.
         self.pub_cmd.publish(cmd)
