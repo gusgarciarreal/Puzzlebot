@@ -3,6 +3,13 @@
 Welcome to the collaborative repository for the **Puzzlebot** robot!  
 This space is dedicated to the development and integration of various modules to bring our robot to life with both autonomous and manual control systems.
 
+<p align="center">
+  <a href="https://youtu.be/PP4M3LmFDbM" target="_blank">
+    <img src="https://img.youtube.com/vi/lm2Cisp2zHo/hqdefault.jpg" width="720" alt="Puzzlebot YouTube">
+  </a>
+</p>
+
+
 ## 🚧 What You’ll Find Here
 
 - 🎯 **Computer Vision**: Tools and scripts for object detection, navigation, and visual input processing.
