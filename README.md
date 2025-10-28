@@ -9,6 +9,14 @@ This space is dedicated to the development and integration of various modules to
   </a>
 </p>
 
+🤖 Thanks to our performance and results with the **Puzzlebot, Manchester Robotics gave us a special mention on LinkedIn** for the quality of our design, control, and project development.
+
+<p align="center">
+  <img src="/LinkedinMention.png" alt="LinkedIn Mention From Manchester Robotics" width="700">
+  <br>
+  <em>LinkedIn Mention From Manchester Robotics</em>
+</p>
+
 
 ## 🚧 What You’ll Find Here
 
