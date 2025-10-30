@@ -4,7 +4,7 @@ Welcome to the collaborative repository for the **Puzzlebot** robot!
 This space is dedicated to the development and integration of various modules to bring our robot to life with both autonomous and manual control systems.
 
 <p align="center">
-  <a href="https://youtu.be/PP4M3LmFDbM" target="_blank">
+  <a href="https://youtu.be/lm2Cisp2zHo" target="_blank">
     <img src="https://img.youtube.com/vi/lm2Cisp2zHo/hqdefault.jpg" width="720" alt="Puzzlebot YouTube">
   </a>
 </p>
